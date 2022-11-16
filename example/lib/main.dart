@@ -30,6 +30,8 @@ class _MyAppState extends State<MyApp> {
       } else {
         log("video file load failed");
       }
+    }).catchError((e) {
+      log("controller.initialize() error occurs: $e");
     });
   }
 
