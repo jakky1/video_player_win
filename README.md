@@ -1,0 +1,223 @@
+# video_player_win
+
+![pub version][visits-count-image] 
+
+[visits-count-image]: https://img.shields.io/badge/dynamic/json?label=Visits%20Count&query=value&url=https://api.countapi.xyz/hit/jakky1_video_player_win/visits
+
+Video player for Windows, lightweight, using Windows built-in Media Foundation API. 
+Windows implementation of the [video_player][1] plugin.
+
+## Platform Support
+
+| Windows |
+| :-----: |
+|    ✔️  (Vista+)   |
+
+## Other Platform Support  (Windows / Android / iOS / Web)
+## Built-in control panel & Fullscreen & Subtitle support
+
+If your application will run on Windows / Android / iOS / Web,
+or if you want a built-in video control panel,
+or if you need to show subtitles,
+please use package [video_player_control_panel] [2] instead.
+Which also use this package to play media on Windows.
+
+## Supported Formats in Windows (Important !)
+
+This package use Windows built-in Media Foundation API. Lightweight !
+The playback use the codecs preload in your Windows environment.
+All the media format can be played by WMP (Windows Media Player) can also be played by this package.
+However, the preloaded codecs in Windows is limited.
+
+If you have a media file cannot played by this package, ALSO CANNOT played by WMP  (Windows Media Player), it means that this media file is not support by codecs preloaded in your Windows.
+
+In this case, please install ONE of the following codec pack into your Windows:
+- [K-Lite codec pack][3]
+- [Windows 10 Codec Pack][4]
+
+You can also auto-install for users when your application first launched by the following sample command:
+```
+shell>  K-Lite_Codec_Pack_1730_Basic.exe /silent
+```
+with the following sample Dart code:
+```
+import 'dart:io';
+
+Process.run('E:\\K-Lite_Codec_Pack_1730_Basic.exe', ['/silent']).then((value) {
+  if (value.exitCode == 0) log("installation success");
+  else log("installation failed");
+});
+```
+
+After install the codec pack, most of the media format are supported.
+
+
+## Quick Start
+
+### Installation
+
+Add this to your package's `pubspec.yaml` file:
+
+```yaml
+dependencies:
+  video_player_win: ^1.0.0
+```
+
+Or
+
+```yaml
+dependencies:
+  video_player_win:
+    git:
+      url: https://github.com/jakky1/video_player_win.git
+      ref: master
+```
+
+# Usage
+
+## register player first
+
+Before starting play media, you should add the following code:
+```
+import 'package:video_player_win/video_player_win_plugin.dart';
+
+if (!kIsWeb && Platform.isWindows) WindowsVideoPlayer.registerWith();
+```
+
+## video / audio playback
+
+Play from network source:
+```
+var controller = WinVideoPlayerController.network("https://www.your-web.com/sample.mp4");
+controller.initialize().then((value) {
+  if (controller.value.isInitialized) {
+    controller.play();
+  } else {
+    log("video file load failed");
+  }
+});
+```
+
+Play from file:
+```
+var controller = WinVideoPlayerController.file(File("E:\\test.mp4"));
+```
+
+If the file is a video, build a display widget to show video frames:
+```
+Widget build(BuildContext context) {
+  return WinVideoPlayer(controller);
+}
+```
+
+# operations
+
+- Play: ``` controller.play(); ```
+- Pause: ``` controller.pause(); ```
+- Seek: ``` controller.seekTo( Duration(minute: 10, second:30) ); ```
+- set playback speed: (normal speed: 1.0)
+``` controller.setPlaybackSpeed(1.5); ```
+- set volume: (max: 1.0 , mute: 0.0)
+``` controller.setVolume(0.5); ```
+- set looping:  ``` controller.setLooping(true); ```
+- free resource: ``` controller.dispose(); ```
+
+# Listen playback events and values
+```
+void onPlaybackEvent() {
+	final value = controller.value;
+	// value.isInitialized (bool)
+	// value.size (Size, video size)
+	// value.duration (Duration)
+	// value.isPlaying (bool)
+	// value.isBuffering (bool)
+	// value.position (Duration)
+}
+controller.addListener(onPlaybackEvent);
+...
+controller.removeListener(onPlaybackEvent); // remember to removeListener()
+```
+## Release resource
+```
+controller.dispose();
+```
+
+### Example
+
+```
+import 'dart:developer';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:video_player_win/video_player_win.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+
+  late WinVideoPlayerController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = WinVideoPlayerController.file(File("E:\\test_youtube.mp4"));
+    controller.initialize().then((value) {
+      if (controller.value.isInitialized) {
+        controller.play();
+        setState(() {});
+      } else {
+        log("video file load failed");
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    controller.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('video_player_win example app'),
+        ),
+        
+        body: Stack(children: [
+          WinVideoPlayer(controller),
+          Positioned(
+            bottom: 0,
+            child: Column(children: [
+              ValueListenableBuilder(
+                valueListenable: controller, 
+                builder: ((context, value, child) {
+                  int minute = controller.value.position.inMinutes;
+                  int second = controller.value.position.inSeconds % 60;
+                  return Text("$minute:$second", style: Theme.of(context).textTheme.headline6!.copyWith(color: Colors.white, backgroundColor: Colors.black54));
+                }),
+              ),
+              ElevatedButton(onPressed: () => controller.play(), child: const Text("Play")),
+              ElevatedButton(onPressed: () => controller.pause(), child: const Text("Pause")),
+              ElevatedButton(onPressed: () => controller.seekTo(Duration(milliseconds: controller.value.position.inMilliseconds+ 10*1000)), child: const Text("Forward")),
+            ])),
+        ]),
+      ),
+    );
+  }
+}
+```
+[1]: https://pub.dev/packages/video_player "video_player"
+[2]: https://pub.dev/packages/video_player_control_panel "video_player_control_panel"
+[3]: https://codecguide.com/ "K-Lite Codec Pack"
+[4]: https://www.windows10codecpack.com/ "Windows 10 Codec Pack"
