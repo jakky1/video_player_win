@@ -95,6 +95,8 @@ controller.initialize().then((value) {
   } else {
     log("video file load failed");
   }
+}).catchError((e) {
+  log("controller.initialize() error occurs: $e");
 });
 ```
 
