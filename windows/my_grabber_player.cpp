@@ -23,7 +23,6 @@
 
 #define CHECK_HR(x) if (FAILED(x)) { goto done; }
 
-template<class T>
 class CAsyncCallback : public IMFAsyncCallback
 {
     // ref: https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/DX11VideoRenderer/cpp/Common.h       
@@ -32,23 +31,19 @@ public:
     typedef std::function<HRESULT(IMFAsyncResult*)> InvokeFn;
     //typedef HRESULT(InvokeFn)(IMFAsyncResult* pAsyncResult);
 
-    CAsyncCallback(T* pParent, InvokeFn fn) :
-        m_pParent(pParent),
+    CAsyncCallback(InvokeFn fn) :
         m_pInvokeFn(fn)
     {
     }
 
     // IUnknown
-    STDMETHODIMP_(ULONG) AddRef(void)
-    {
-        // Delegate to parent class.
-        return m_pParent->AddRef();
+    inline STDMETHODIMP_(ULONG) AddRef() {
+        return InterlockedIncrement(&m_cRef);
     }
-
-    STDMETHODIMP_(ULONG) Release(void)
-    {
-        // Delegate to parent class.
-        return m_pParent->Release();
+    STDMETHODIMP_(ULONG) Release() {
+        ULONG uCount = InterlockedDecrement(&m_cRef);
+        if (uCount == 0) delete this;
+        return uCount;
     }
 
     STDMETHODIMP QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv)
@@ -88,7 +83,7 @@ public:
 
 private:
 
-    T* m_pParent;
+    long m_cRef = 1;
     InvokeFn m_pInvokeFn;
 };
 
@@ -109,7 +104,7 @@ public:
     STDMETHODIMP_(ULONG) AddRef();
     STDMETHODIMP_(ULONG) Release();
 
-    void SetUserCallback(MyPlayerCallback* cb) { m_pUserCallback = cb;  } //Jacky
+    void SetUserCallback(MyPlayerCallback* cb) { m_pUserCallback = cb; } //Jacky
 
     // IMFClockStateSink methods
     STDMETHODIMP OnClockStart(MFTIME hnsSystemTime, LONGLONG llClockStartOffset);
@@ -189,7 +184,7 @@ done:
 
 HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
 {
-    // Create the media source.
+    this->AddRef(); // keep *this alive before callback called
     HRESULT hr = CreateMediaSourceAsync(pszFileName, [=](IMFMediaSource* pSource) -> void {
         HRESULT hr;
         wil::com_ptr<SampleGrabberCB> pCallback;
@@ -197,11 +192,16 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
         wil::com_ptr<IMFTopology> pTopology;
         wil::com_ptr<IMFMediaType> pType;
         wil::com_ptr<IMFClock> pClock;
+        wil::com_ptr<IMFMediaSource> pMediaSource;
 
-        if (pSource == NULL) {
-            hr = E_FAIL;
-            goto done; //load fail or abort
+        if (this->Release() <= 0 || pSource == NULL) {
+            //load fail or abort
+            if (pSource) pSource->Release();
+            loadCallback(false);
+            return; // *this* maybe already deleted, so don't access any *this members, and return immediately!
         }
+        pMediaSource = pSource;
+        pSource = NULL;
 
         // Configure the media type that the Sample Grabber will receive.
         // Setting the major and subtype is usually enough for the topology loader
@@ -231,7 +231,7 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
         CHECK_HR(hr = MFCreateMediaSession(NULL, &m_pSession));
 
         // Create the topology.
-        CHECK_HR(hr = CreateTopology(pSource, pSinkActivate.get(), &pTopology));
+        CHECK_HR(hr = CreateTopology(pMediaSource.get(), pSinkActivate.get(), &pTopology));
 
         // Run the media session.
         CHECK_HR(hr = m_pSession->SetTopology(0, pTopology.get()));
@@ -257,14 +257,13 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
             CHECK_HR(hr = pAudioVolume->SetAllVolumes(channelsCount, volumes));
         }
         */
-       if (m_isShutdown) hr = E_FAIL;
+        if (m_isShutdown) hr = E_FAIL;
 
     done:
         // Clean up.
         if (FAILED(hr)) Shutdown();
         loadCallback(SUCCEEDED(hr));
-        if (pSource) pSource->Release();
-    });
+        });
 
     // Clean up.
     if (FAILED(hr)) Shutdown();
@@ -353,8 +352,10 @@ void MyPlayer::Shutdown()
     m_hnsDuration = -1;
     cancelAsyncLoad();
 
+    // NOTE: because m_pSession->BeginGetEvent(this) will keep *this, 
+    //       so we need to call m_pSession->Shutdown() first
+    //       then client call player->Release() will make refCount = 0
     if (m_pSession) m_pSession->Shutdown();
-    m_pSession.reset();
 }
 
 void MyPlayer::cancelAsyncLoad() {
@@ -406,20 +407,22 @@ HRESULT MyPlayer::CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMe
 {
     // Create the source resolver.
     HRESULT hr = S_OK;
-    CAsyncCallback<MyPlayer>* cb = NULL;
+    CAsyncCallback* cb = NULL;
     CHECK_HR(hr = MFCreateSourceResolver(&m_pSourceResolver));
 
-    this->AddRef();
+    this->AddRef(); // prevent *this released before callback
     hr = m_pSourceResolver->BeginCreateObjectFromURL(pszURL,
         MF_RESOLUTION_MEDIASOURCE, NULL, &m_pSourceResolverCancelCookie,
-        cb = new CAsyncCallback<MyPlayer>(this, [=](IMFAsyncResult* pResult) -> HRESULT {
+        cb = new CAsyncCallback([=](IMFAsyncResult* pResult) -> HRESULT {
             HRESULT hr;
             MF_OBJECT_TYPE ObjectType;
             wil::com_ptr<IUnknown> pSource;
-            IMFMediaSource* pMediaSource = NULL;
+            wil::com_ptr<IMFMediaSource> pMediaSource;
 
             if (this->Release() <= 0 || m_isShutdown) {
-                return E_FAIL;
+                //pResult->Release();
+                callback(NULL);
+                return E_FAIL; // *this* maybe already deleted, so don't access any *this members, and return immediately!
             }
 
             if (m_pSourceResolver) { // m_pSourceResolver maybe null since Shutdown() called immediately after OpenURL()
@@ -431,21 +434,21 @@ HRESULT MyPlayer::CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMe
                 hr = E_FAIL;
                 goto done;
             }
-            
-            callback(pMediaSource);
 
-            done:
-            m_pSourceResolver.reset();
-            m_pSourceResolverCancelCookie.reset();
-            //if (pMediaSource) pMediaSource->Release();
+            pMediaSource->AddRef();
+            callback(pMediaSource.get());
+
+        done:
+            //m_pSourceResolver.reset();
+            //m_pSourceResolverCancelCookie.reset();
             if (FAILED(hr)) callback(NULL);
             return S_OK;
-        }),
+            }),
         NULL);
     CHECK_HR(hr);
 
 done:
-    if(cb) cb->Release();
+    if (cb) cb->Release();
     if (FAILED(hr)) {
         m_pSourceResolver.reset();
         m_pSourceResolverCancelCookie.reset();

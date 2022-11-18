@@ -161,7 +161,11 @@ void destroyPlayerById(int64_t textureId) {
     texture_registar_->UnregisterTexture(data->textureId);
     data->textureId = -1;
   }
-  //data->Shutdown();
+  
+  // NOTE: because m_pSession->BeginGetEvent(this) will keep *this (player), 
+  //       so we need to call m_pSession->Shutdown() first
+  //       then client call player->Release() will make refCount = 0
+  data->Shutdown();
   data->Release();
 }
 

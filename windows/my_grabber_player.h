@@ -4,6 +4,7 @@
 #include <mfidl.h>
 #include <mfapi.h>
 #include <audiopolicy.h>
+#include <functional>
 
 #include <wil/com.h>
 
@@ -33,7 +34,7 @@ private:
 	long m_cRef = 1;
 
 public:
-	HRESULT OpenURL(const WCHAR* pszFileName, MyPlayerCallback* callback, HWND hwndVideo = NULL);
+	HRESULT OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback);
 	HRESULT Play(LONGLONG ms = -1);
 	HRESULT Pause();
 	void Shutdown();
@@ -57,6 +58,7 @@ protected:
 	HRESULT GetParameters(DWORD* pdwFlags, DWORD* pdwQueue);
 	HRESULT Invoke(IMFAsyncResult* pResult);
 	virtual void OnPlayerEvent(MediaEventType event) {};
+	HRESULT CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMediaSource* pSource)> callback);
 
 	UINT32 m_VideoWidth;
 	UINT32 m_VideoHeight;
@@ -64,11 +66,14 @@ protected:
 private:
 	HRESULT initAudioVolume();
 	HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActivate, IMFTopology** ppTopo);
+	void cancelAsyncLoad();
 
 	wil::com_ptr<IMFMediaSession> m_pSession;
-	wil::com_ptr<IMFMediaSource> m_pSource;
 	wil::com_ptr<ISimpleAudioVolume> m_pSimpleAudioVolume;
 	wil::com_ptr<IMFPresentationClock> m_pClock;
 	wil::com_ptr<IMFRateControl> m_pRate;
+	wil::com_ptr<IMFSourceResolver> m_pSourceResolver;
+	wil::com_ptr<IUnknown> m_pSourceResolverCancelCookie;
 	MFTIME m_hnsDuration;
+	bool m_isShutdown;
 };
