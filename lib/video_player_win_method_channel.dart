@@ -88,13 +88,13 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
   Future<int> getCurrentPosition(int textureId) async {
     // TODO: sometimes will return 0 when seeking... seems a bug in windows media foundation API...
     var value = await methodChannel.invokeMethod<int>('getCurrentPosition', { "textureId": textureId });
-    return value!;
+    return value ?? -1;
   }
 
   @override
   Future<int> getDuration(int textureId) async {
     var value = await methodChannel.invokeMethod<int>('getDuration', { "textureId": textureId });
-    return value!;
+    return value ?? -1;
   }
 
   @override

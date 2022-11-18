@@ -23,6 +23,77 @@
 
 #define CHECK_HR(x) if (FAILED(x)) { goto done; }
 
+template<class T>
+class CAsyncCallback : public IMFAsyncCallback
+{
+    // ref: https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/DX11VideoRenderer/cpp/Common.h       
+public:
+
+    typedef std::function<HRESULT(IMFAsyncResult*)> InvokeFn;
+    //typedef HRESULT(InvokeFn)(IMFAsyncResult* pAsyncResult);
+
+    CAsyncCallback(T* pParent, InvokeFn fn) :
+        m_pParent(pParent),
+        m_pInvokeFn(fn)
+    {
+    }
+
+    // IUnknown
+    STDMETHODIMP_(ULONG) AddRef(void)
+    {
+        // Delegate to parent class.
+        return m_pParent->AddRef();
+    }
+
+    STDMETHODIMP_(ULONG) Release(void)
+    {
+        // Delegate to parent class.
+        return m_pParent->Release();
+    }
+
+    STDMETHODIMP QueryInterface(REFIID iid, __RPC__deref_out _Result_nullonfailure_ void** ppv)
+    {
+        if (!ppv)
+        {
+            return E_POINTER;
+        }
+        if (iid == __uuidof(IUnknown))
+        {
+            *ppv = static_cast<IUnknown*>(static_cast<IMFAsyncCallback*>(this));
+        }
+        else if (iid == __uuidof(IMFAsyncCallback))
+        {
+            *ppv = static_cast<IMFAsyncCallback*>(this);
+        }
+        else
+        {
+            *ppv = NULL;
+            return E_NOINTERFACE;
+        }
+        AddRef();
+        return S_OK;
+    }
+
+    // IMFAsyncCallback methods
+    STDMETHODIMP GetParameters(__RPC__out DWORD* pdwFlags, __RPC__out DWORD* pdwQueue)
+    {
+        // Implementation of this method is optional.
+        return E_NOTIMPL;
+    }
+
+    STDMETHODIMP Invoke(__RPC__in_opt IMFAsyncResult* pAsyncResult)
+    {
+        return (m_pInvokeFn)(pAsyncResult);
+    }
+
+private:
+
+    T* m_pParent;
+    InvokeFn m_pInvokeFn;
+};
+
+// --------------------------------------------------------------------------
+
 class SampleGrabberCB : public IMFSampleGrabberSinkCallback
 {
     long m_cRef;
@@ -55,7 +126,6 @@ public:
     STDMETHODIMP OnShutdown();
 };
 
-HRESULT CreateMediaSource(PCWSTR pszURL, IMFMediaSource** ppSource);
 HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSink, IMFTopology** ppTopo);
 
 // --------------------------------------------------------------------------
@@ -63,7 +133,8 @@ HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSink, IMFTopology*
 MyPlayer::MyPlayer() :
     m_hnsDuration(-1),
     m_VideoWidth(0),
-    m_VideoHeight(0)
+    m_VideoHeight(0),
+    m_isShutdown(false)
 {
     initAudioVolume();
 }
@@ -116,74 +187,85 @@ done:
     return hr;
 }
 
-HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* callback, HWND hwndVideo)
+HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
 {
-    HRESULT hr;
-    wil::com_ptr<SampleGrabberCB> pCallback;
-    wil::com_ptr<IMFActivate> pSinkActivate;
-    wil::com_ptr<IMFTopology> pTopology;
-    wil::com_ptr<IMFMediaType> pType;
-    wil::com_ptr<IMFClock> pClock;
-
-    // Configure the media type that the Sample Grabber will receive.
-    // Setting the major and subtype is usually enough for the topology loader
-    // to resolve the topology.
-
-    CHECK_HR(hr = MFCreateMediaType(&pType));
-    CHECK_HR(hr = pType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video));
-    CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32)); //OK
-    //CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32)); //fail
-
-    if (callback != NULL) //Jacky
-    {
-        // Create the sample grabber sink.
-        CHECK_HR(hr = SampleGrabberCB::CreateInstance(&pCallback));
-        pCallback->SetUserCallback(callback);
-        CHECK_HR(hr = MFCreateSampleGrabberSinkActivate(pType.get(), pCallback.get(), &pSinkActivate)); //Jacky
-    }
-    else
-    {
-        CHECK_HR(hr = MFCreateVideoRendererActivate(hwndVideo, &pSinkActivate)); //Jacky
-    }
-
-    // To run as fast as possible, set this attribute (requires Windows 7):
-    CHECK_HR(hr = pSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, FALSE)); //Jacky
-
-    // Create the Media Session.
-    CHECK_HR(hr = MFCreateMediaSession(NULL, &m_pSession));
-
     // Create the media source.
-    CHECK_HR(hr = CreateMediaSource(pszFileName, &m_pSource));
+    HRESULT hr = CreateMediaSourceAsync(pszFileName, [=](IMFMediaSource* pSource) -> void {
+        HRESULT hr;
+        wil::com_ptr<SampleGrabberCB> pCallback;
+        wil::com_ptr<IMFActivate> pSinkActivate;
+        wil::com_ptr<IMFTopology> pTopology;
+        wil::com_ptr<IMFMediaType> pType;
+        wil::com_ptr<IMFClock> pClock;
 
-    // Create the topology.
-    CHECK_HR(hr = CreateTopology(m_pSource.get(), pSinkActivate.get(), &pTopology));
+        if (pSource == NULL) {
+            hr = E_FAIL;
+            goto done; //load fail or abort
+        }
 
-    // Run the media session.
-    CHECK_HR(hr = m_pSession->SetTopology(0, pTopology.get()));
+        // Configure the media type that the Sample Grabber will receive.
+        // Setting the major and subtype is usually enough for the topology loader
+        // to resolve the topology.
 
-    // Get the presentation clock (optional)
-    CHECK_HR(hr = m_pSession->GetClock(&pClock));
-    CHECK_HR(hr = pClock->QueryInterface(IID_PPV_ARGS(&m_pClock)));
+        CHECK_HR(hr = MFCreateMediaType(&pType));
+        CHECK_HR(hr = pType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video));
+        CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32)); //OK
+        //CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32)); //fail
 
-    // Get the rate control interface (optional)
-    CHECK_HR(MFGetService(m_pSession.get(), MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS(&m_pRate)));
+        if (playerCallback != NULL) //Jacky
+        {
+            // Create the sample grabber sink.
+            CHECK_HR(hr = SampleGrabberCB::CreateInstance(&pCallback));
+            pCallback->SetUserCallback(playerCallback);
+            CHECK_HR(hr = MFCreateSampleGrabberSinkActivate(pType.get(), pCallback.get(), &pSinkActivate)); //Jacky
+        }
+        else
+        {
+            CHECK_HR(hr = MFCreateVideoRendererActivate(hwndVideo, &pSinkActivate)); //Jacky
+        }
 
-    // add event listener
-    m_pSession->BeginGetEvent(this, NULL);
+        // To run as fast as possible, set this attribute (requires Windows 7):
+        CHECK_HR(hr = pSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, FALSE)); //Jacky
 
-    /* Jacky test, try to get volume control fail... {
-    {
-        UINT32 channelsCount;
-        float volumes[100];
-        IMFAudioStreamVolume* pAudioVolume = NULL;
-        CHECK_HR(hr = MFGetService(m_pSession, MR_STREAM_VOLUME_SERVICE, IID_PPV_ARGS(&pAudioVolume))); // will fail here... no such interface error...
-        CHECK_HR(hr = pAudioVolume->GetChannelCount(&channelsCount));
-        for (int i = 0; i < channelsCount; i++) volumes[i] = 10;
-        CHECK_HR(hr = pAudioVolume->SetAllVolumes(channelsCount, volumes));
-    }
-    */
+        // Create the Media Session.
+        CHECK_HR(hr = MFCreateMediaSession(NULL, &m_pSession));
 
-done:
+        // Create the topology.
+        CHECK_HR(hr = CreateTopology(pSource, pSinkActivate.get(), &pTopology));
+
+        // Run the media session.
+        CHECK_HR(hr = m_pSession->SetTopology(0, pTopology.get()));
+
+        // Get the presentation clock (optional)
+        CHECK_HR(hr = m_pSession->GetClock(&pClock));
+        CHECK_HR(hr = pClock->QueryInterface(IID_PPV_ARGS(&m_pClock)));
+
+        // Get the rate control interface (optional)
+        CHECK_HR(MFGetService(m_pSession.get(), MF_RATE_CONTROL_SERVICE, IID_PPV_ARGS(&m_pRate)));
+
+        // add event listener
+        m_pSession->BeginGetEvent(this, NULL);
+
+        /* Jacky test, try to get volume control fail... {
+        {
+            UINT32 channelsCount;
+            float volumes[100];
+            IMFAudioStreamVolume* pAudioVolume = NULL;
+            CHECK_HR(hr = MFGetService(m_pSession, MR_STREAM_VOLUME_SERVICE, IID_PPV_ARGS(&pAudioVolume))); // will fail here... no such interface error...
+            CHECK_HR(hr = pAudioVolume->GetChannelCount(&channelsCount));
+            for (int i = 0; i < channelsCount; i++) volumes[i] = 10;
+            CHECK_HR(hr = pAudioVolume->SetAllVolumes(channelsCount, volumes));
+        }
+        */
+       if (m_isShutdown) hr = E_FAIL;
+
+    done:
+        // Clean up.
+        if (FAILED(hr)) Shutdown();
+        loadCallback(SUCCEEDED(hr));
+        if (pSource) pSource->Release();
+    });
+
     // Clean up.
     if (FAILED(hr)) Shutdown();
     return hr;
@@ -191,6 +273,7 @@ done:
 
 HRESULT MyPlayer::Play(LONGLONG ms)
 {
+    if (m_pSession == NULL) return E_FAIL;
     if (ms >= 0) return Seek(ms);
 
     PROPVARIANT var;
@@ -200,18 +283,22 @@ HRESULT MyPlayer::Play(LONGLONG ms)
 
 HRESULT MyPlayer::Pause()
 {
+    if (m_pSession == NULL) return E_FAIL;
     return m_pSession->Pause();
 }
 
 LONGLONG MyPlayer::GetDuration()
 {
+    if (m_pSession == NULL) return -1;
     return m_hnsDuration / 10000;
 }
 
 LONGLONG MyPlayer::GetCurrentPosition()
 {
     MFTIME pos;
-    HRESULT hr = m_pClock->GetTime(&pos);
+    HRESULT hr;
+    if (m_pSession == NULL) return -1;
+    hr = m_pClock->GetTime(&pos);
     if (FAILED(hr)) return -1;
     return pos / 10000;
 }
@@ -219,6 +306,7 @@ LONGLONG MyPlayer::GetCurrentPosition()
 HRESULT MyPlayer::Seek(LONGLONG ms)
 {
     PROPVARIANT var;
+    if (m_pSession == NULL) return E_FAIL;
     PropVariantInit(&var);
     var.vt = VT_I8;
     var.hVal.QuadPart = ms * 10000;
@@ -235,30 +323,46 @@ SIZE MyPlayer::GetVideoSize()
 
 HRESULT MyPlayer::SetPlaybackSpeed(float speed)
 {
+    if (m_pSession == NULL) return E_FAIL;
     return m_pRate->SetRate(FALSE, speed);
 }
 
-HRESULT MyPlayer::GetVolume(float *pVol)
+HRESULT MyPlayer::GetVolume(float* pVol)
 {
+    if (m_pSession == NULL) return E_FAIL;
     return m_pSimpleAudioVolume->GetMasterVolume(pVol);
 }
 
 HRESULT MyPlayer::SetVolume(float vol)
 {
+    if (m_pSession == NULL) return E_FAIL;
     return m_pSimpleAudioVolume->SetMasterVolume(vol, NULL);
 }
 
 HRESULT MyPlayer::SetMute(bool bMute)
 {
+    if (m_pSession == NULL) return E_FAIL;
     return m_pSimpleAudioVolume->SetMute(bMute, NULL);
 }
 
 
 void MyPlayer::Shutdown()
 {
-    if (m_pSource) m_pSource->Shutdown();
-    if (m_pSession) m_pSession->Shutdown();
+    if (m_isShutdown) return;
+    m_isShutdown = true;
     m_hnsDuration = -1;
+    cancelAsyncLoad();
+
+    if (m_pSession) m_pSession->Shutdown();
+    m_pSession.reset();
+}
+
+void MyPlayer::cancelAsyncLoad() {
+    if (m_pSourceResolver != NULL && m_pSourceResolverCancelCookie != NULL) {
+        m_pSourceResolver->CancelObjectCreation(m_pSourceResolverCancelCookie.get());
+        m_pSourceResolver.reset();
+        m_pSourceResolverCancelCookie.reset();
+    }
 }
 
 HRESULT MyPlayer::GetParameters(DWORD* pdwFlags, DWORD* pdwQueue)
@@ -272,6 +376,7 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
     wil::com_ptr<IMFMediaEvent> pEvent;
     MediaEventType meType = MEUnknown;
 
+    if (m_pSession == NULL) return E_FAIL;
     CHECK_HR(hr = m_pSession->EndGetEvent(pResult, &pEvent));
     CHECK_HR(hr = pEvent->GetType(&meType));
     CHECK_HR(hr = m_pSession->BeginGetEvent(this, NULL));
@@ -297,22 +402,54 @@ done:
 // --------------------------------------------------------------------------
 
 // Create a media source from a URL.
-HRESULT CreateMediaSource(PCWSTR pszURL, IMFMediaSource** ppSource)
+HRESULT MyPlayer::CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMediaSource* pSource)> callback)
 {
-    wil::com_ptr<IMFSourceResolver> pSourceResolver;
-    wil::com_ptr<IUnknown> pSource;
-
     // Create the source resolver.
     HRESULT hr = S_OK;
-    CHECK_HR(hr = MFCreateSourceResolver(&pSourceResolver));
+    CAsyncCallback<MyPlayer>* cb = NULL;
+    CHECK_HR(hr = MFCreateSourceResolver(&m_pSourceResolver));
 
-    MF_OBJECT_TYPE ObjectType;
-    CHECK_HR(hr = pSourceResolver->CreateObjectFromURL(pszURL,
-        MF_RESOLUTION_MEDIASOURCE, NULL, &ObjectType, &pSource));
+    this->AddRef();
+    hr = m_pSourceResolver->BeginCreateObjectFromURL(pszURL,
+        MF_RESOLUTION_MEDIASOURCE, NULL, &m_pSourceResolverCancelCookie,
+        cb = new CAsyncCallback<MyPlayer>(this, [=](IMFAsyncResult* pResult) -> HRESULT {
+            HRESULT hr;
+            MF_OBJECT_TYPE ObjectType;
+            wil::com_ptr<IUnknown> pSource;
+            IMFMediaSource* pMediaSource = NULL;
 
-    hr = pSource->QueryInterface(IID_PPV_ARGS(ppSource));
+            if (this->Release() <= 0 || m_isShutdown) {
+                return E_FAIL;
+            }
+
+            if (m_pSourceResolver) { // m_pSourceResolver maybe null since Shutdown() called immediately after OpenURL()
+                CHECK_HR(hr = m_pSourceResolver->EndCreateObjectFromURL(pResult, &ObjectType, &pSource));
+                CHECK_HR(hr = pSource->QueryInterface(IID_PPV_ARGS(&pMediaSource)));
+            }
+            else
+            {
+                hr = E_FAIL;
+                goto done;
+            }
+            
+            callback(pMediaSource);
+
+            done:
+            m_pSourceResolver.reset();
+            m_pSourceResolverCancelCookie.reset();
+            //if (pMediaSource) pMediaSource->Release();
+            if (FAILED(hr)) callback(NULL);
+            return S_OK;
+        }),
+        NULL);
+    CHECK_HR(hr);
 
 done:
+    if(cb) cb->Release();
+    if (FAILED(hr)) {
+        m_pSourceResolver.reset();
+        m_pSourceResolverCancelCookie.reset();
+    }
     return hr;
 }
 

@@ -38,6 +38,7 @@ public:
   MyPlayerInternal() {}
   ~MyPlayerInternal() {
     if (m_pBuffer != NULL) delete m_pBuffer;
+    m_pBuffer = NULL;
   }
 
 private:
@@ -88,6 +89,7 @@ private:
       LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
       DWORD dwSampleSize) 
   {
+      if (textureId == -1) return; //player maybe shutdown or deleted
       uint64_t now = getCurrentTime();
       if (now - lastFrameTime < 30) return;
       lastFrameTime = now;
@@ -110,6 +112,7 @@ private:
       BYTE *pDst = m_pBuffer;
       BYTE *pDstEnd = pDst + dwSampleSize;
       do {
+        if (textureId == -1) break;
         *(pDst++) = *(pSrc--);
         *(pDst++) = *(pSrc--);
         *(pDst) = *(pSrc);
@@ -118,7 +121,9 @@ private:
         pSrc += (4 + 2);
       } while (pDst < pDstEnd);
 
-      texture_registar_->MarkTextureFrameAvailable(textureId);
+      if (texture_registar_ != NULL && textureId != -1) {
+        texture_registar_->MarkTextureFrameAvailable(textureId);
+      }
   }
 };
 
@@ -151,12 +156,13 @@ MyPlayerInternal* getPlayerById(int64_t textureId, bool autoCreate = false) {
 void destroyPlayerById(int64_t textureId) {
   MyPlayerInternal* data = playerMap[textureId];
   if (data == NULL) return;
-  if (data->textureId >= 0) {
+  playerMap.erase(textureId);
+  if (data->textureId != -1) {
     texture_registar_->UnregisterTexture(data->textureId);
     data->textureId = -1;
   }
-  delete data;
-  playerMap.erase(textureId);
+  //data->Shutdown();
+  data->Release();
 }
 
 // Jacky }
@@ -187,7 +193,10 @@ void VideoPlayerWinPlugin::RegisterWithRegistrar(
 
 VideoPlayerWinPlugin::VideoPlayerWinPlugin() {}
 
-VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {}
+VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {
+  texture_registar_ = NULL; //Jacky
+  MFShutdown();
+}
 void VideoPlayerWinPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
@@ -195,30 +204,53 @@ void VideoPlayerWinPlugin::HandleMethodCall(
   flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
 
   auto textureId = arguments[flutter::EncodableValue("textureId")].LongValue();
-  auto player = getPlayerById(textureId, true);
+  MyPlayerInternal* player;
   bool isOpenVideo = method_call.method_name().compare("openVideo") == 0;
-  if (player == nullptr && !isOpenVideo) {
-    result->Error("player not created");
+  if (isOpenVideo) {
+    player = getPlayerById(-1, true);
+  } else {
+    player = getPlayerById(textureId, false);
+  }
+  if (player == nullptr) {
+    result->Success();
     return;
   }
 
   if (isOpenVideo) {
     auto path = std::get<std::string>(arguments[flutter::EncodableValue("path")]);
 
-    HRESULT hr = player->OpenURL(std::wstring(path.begin(), path.end()).c_str(), player);
-    if (SUCCEEDED(hr)) {
-      SIZE videoSize = player->GetVideoSize();
-      flutter::EncodableMap map;
-      float volume = 1.0f;
-      player->GetVolume(&volume);
-      map[flutter::EncodableValue("result")] = flutter::EncodableValue(true);
-      map[flutter::EncodableValue("textureId")] = flutter::EncodableValue(player->textureId);
-      map[flutter::EncodableValue("duration")] = flutter::EncodableValue((int64_t)player->GetDuration());
-      map[flutter::EncodableValue("videoWidth")] = flutter::EncodableValue(videoSize.cx);
-      map[flutter::EncodableValue("videoHeight")] = flutter::EncodableValue(videoSize.cy);
-      map[flutter::EncodableValue("volume")] = flutter::EncodableValue((double)volume);
-      result->Success(flutter::EncodableValue(map));
-    } else {
+    textureId = player->textureId;
+    std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
+    HRESULT hr = player->OpenURL(std::wstring(path.begin(), path.end()).c_str(), player, NULL, [=](bool isSuccess) {
+      if (isSuccess) {
+        auto _player = getPlayerById(textureId, false);
+        if (_player == NULL) {
+          // the player is disposed between async OpenURL() and callback here
+          flutter::EncodableMap map;
+          map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
+          shared_result->Success(map);
+          return;
+        }
+
+        SIZE videoSize = _player->GetVideoSize();
+        flutter::EncodableMap map;
+        float volume = 1.0f;
+        _player->GetVolume(&volume);
+        map[flutter::EncodableValue("result")] = flutter::EncodableValue(true);
+        map[flutter::EncodableValue("textureId")] = flutter::EncodableValue(_player->textureId);
+        map[flutter::EncodableValue("duration")] = flutter::EncodableValue((int64_t)_player->GetDuration());
+        map[flutter::EncodableValue("videoWidth")] = flutter::EncodableValue(videoSize.cx);
+        map[flutter::EncodableValue("videoHeight")] = flutter::EncodableValue(videoSize.cy);
+        map[flutter::EncodableValue("volume")] = flutter::EncodableValue((double)volume);
+        shared_result->Success(flutter::EncodableValue(map));
+      } else {
+        destroyPlayerById(player->textureId);
+        flutter::EncodableMap map;
+        map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
+        shared_result->Success(map);
+      }
+    });
+    if (FAILED(hr)) {
       flutter::EncodableMap map;
       map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
       result->Success(map);

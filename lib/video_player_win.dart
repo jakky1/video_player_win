@@ -106,18 +106,16 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   int _lastSeekId = 0; // +1 every time when seekTo() called, to cancel all getCurrentPosition() called before seekTo()
   void _cancelTrackingPosition() => _lastSeekId++;
   void _startTrackingPosition(int seekId) async {
-    // NOTE: DO NOT call getCurrentPosition() during seeking, because windows will return 0...   
-    if (!value.isInitialized || !value.isPlaying || (seekId != _lastSeekId)) return;
-
     // update position value for every 1000 ms
     int delay = 1000 - (value.position.inMilliseconds % 1000);
     delay = delay ~/ value.playbackSpeed + 1;
     await Future.delayed(Duration(milliseconds: delay));
 
-    if (!value.isInitialized || !value.isPlaying || (seekId != _lastSeekId)) return;
+    // NOTE: DO NOT call getCurrentPosition() during seeking, because windows will return 0...   
+    if (textureId_ == -1 || !value.isInitialized || !value.isPlaying || (seekId != _lastSeekId)) return;
 
     var pos = await _getCurrentPosition();
-    if (!value.isInitialized || (seekId != _lastSeekId)) return;
+    if (pos < 0 || textureId_ == -1 || !value.isInitialized || (seekId != _lastSeekId)) return;
     value = value.copyWith(position: Duration(milliseconds: pos));
 
     _startTrackingPosition(seekId);

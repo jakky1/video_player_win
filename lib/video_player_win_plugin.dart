@@ -22,7 +22,7 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
   /// Clears one video.
   @override
   Future<void> dispose(int textureId) async {
-    await VideoPlayerWinPlatform.instance.pause(textureId);
+    await VideoPlayerWinPlatform.instance.destroy(textureId);
   }
 
   /// Creates an instance of a video player and returns its textureId.
