@@ -19,7 +19,7 @@ Windows implementation of the [video_player][1] plugin.
 If your application will run on Windows / Android / iOS / Web,
 or if you want a built-in video control panel,
 or if you need to show subtitles,
-please use package [video_player_control_panel] [2] instead.
+please use package [video_player_control_panel][2] instead.
 Which also use this package to play media on Windows.
 
 ## Supported Formats in Windows (Important !)
@@ -60,7 +60,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  video_player_win: ^1.0.0
+  video_player_win: ^1.0.1
 ```
 
 Or
