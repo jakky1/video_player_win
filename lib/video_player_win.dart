@@ -148,11 +148,17 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         break;
       case 6: // MESessionEnded
         log("[video_player_win] playback event: play ended");
-        value = value.copyWith(isPlaying: false);
+        _cancelTrackingPosition();
+        value = value.copyWith(isPlaying: false, position: value.duration);
         if (_isLooping) {
           seekTo(Duration.zero);
         } else {
-          _eventStreamController.add(VideoEvent(eventType: VideoEventType.completed));
+          // TODO: DO NOT send VideoEventType.completed to package [video_player]
+          // because [video_player] will call pause() then call seekTo(videoDuration)
+          // but seekTo in Windows cause play automatically
+          // since it start play again at the end, ,then we receive MESessionEnded again !
+          // and so on recurivly...
+          //_eventStreamController.add(VideoEvent(eventType: VideoEventType.completed));
         }
         break;
       case 7: // MEError
@@ -263,7 +269,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   }
 
   Future<void> setLooping(bool looping) async {
-    _isLooping = true;
+    _isLooping = looping;
   }
 
   @override

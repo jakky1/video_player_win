@@ -1,3 +1,8 @@
+## 1.0.2
+
+* Fix SetLooping()
+* Fix bug when play to end
+
 ## 1.0.1
 
 * Fix memory leak in cpp code
