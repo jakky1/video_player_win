@@ -1,19 +1,20 @@
 # video_player_win
 
-![pub version][visits-count-image] 
+![pub version][visits-count-image]
 
 [visits-count-image]: https://img.shields.io/badge/dynamic/json?label=Visits%20Count&query=value&url=https://api.countapi.xyz/hit/jakky1_video_player_win/visits
 
-Video player for Windows, lightweight, using Windows built-in Media Foundation API. 
+Video player for Windows, lightweight, using Windows built-in Media Foundation API.
 Windows implementation of the [video_player][1] plugin.
 
 ## Platform Support
 
-| Windows |
-| :-----: |
-|    ✔️  (Vista+)   |
+This package itself support only Windows.
 
-## Other Platform Support  (Windows / Android / iOS / Web)
+But use it with [video_player][1], you can write once then support Windows / Android / iOS / Web at the same time.
+
+Android / iOS / Web is supported by [video_player][1]
+
 ## Built-in control panel & Fullscreen & Subtitle support
 
 If your application will run on Windows / Android / iOS / Web,
@@ -21,6 +22,12 @@ or if you want a built-in video control panel,
 or if you need to show subtitles,
 please use package [video_player_control_panel][2] instead.
 Which also use this package to play media on Windows.
+
+## Play 4K 60fps video in Windows
+
+This package use texture to display video, so play 4K or 60fps video should be slow.
+
+You can try [webview_win_floating][5] to play 4K video by webview on Windows. It use native WebView2 component. If your PC can play 4K video on Microsoft Edge, it may be playable on [webview_win_floating][5] too.
 
 ## Supported Formats in Windows (Important !)
 
@@ -60,6 +67,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
+  video_player: ^2.4.7
   video_player_win: ^1.0.1
 ```
 
@@ -67,6 +75,7 @@ Or
 
 ```yaml
 dependencies:
+  video_player: ^2.4.7
   video_player_win:
     git:
       url: https://github.com/jakky1/video_player_win.git
@@ -88,7 +97,7 @@ if (!kIsWeb && Platform.isWindows) WindowsVideoPlayer.registerWith();
 
 Play from network source:
 ```
-var controller = WinVideoPlayerController.network("https://www.your-web.com/sample.mp4");
+var controller = VideoPlayerController.network("https://www.your-web.com/sample.mp4");
 controller.initialize().then((value) {
   if (controller.value.isInitialized) {
     controller.play();
@@ -102,13 +111,13 @@ controller.initialize().then((value) {
 
 Play from file:
 ```
-var controller = WinVideoPlayerController.file(File("E:\\test.mp4"));
+var controller = VideoPlayerController.file(File("E:\\test.mp4"));
 ```
 
 If the file is a video, build a display widget to show video frames:
 ```
 Widget build(BuildContext context) {
-  return WinVideoPlayer(controller);
+  return VideoPlayer(controller);
 }
 ```
 
@@ -144,7 +153,26 @@ controller.removeListener(onPlaybackEvent); // remember to removeListener()
 controller.dispose();
 ```
 
-### Example
+# standalone mode
+
+If your app only runs on Windows, and you want to remove library dependencies as many as possible, you can modify `pubspec.yaml` file:
+
+```yaml
+dependencies:
+  # video_player: ^2.4.7 # mark this line, for Windows only app
+  video_player_win: ^1.0.1
+```
+
+and modify all the following class name in your code:
+```
+VideoPlayer -> WinVideoPlayer  // add "Win" prefix
+VideoPlayerController -> WinVideoPlayerController  // add "Win" prefix
+```
+
+just only modify class names. All the properties / method are the same with [video_player][1]
+
+
+# Example
 
 ```
 import 'dart:developer';
@@ -166,12 +194,12 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
 
-  late WinVideoPlayerController controller;
+  late VideoPlayerController controller;
 
   @override
   void initState() {
     super.initState();
-    controller = WinVideoPlayerController.file(File("E:\\test_youtube.mp4"));
+    controller = VideoPlayerController.file(File("E:\\test_youtube.mp4"));
     controller.initialize().then((value) {
       if (controller.value.isInitialized) {
         controller.play();
@@ -195,14 +223,14 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('video_player_win example app'),
         ),
-        
+
         body: Stack(children: [
-          WinVideoPlayer(controller),
+          VideoPlayer(controller),
           Positioned(
             bottom: 0,
             child: Column(children: [
               ValueListenableBuilder(
-                valueListenable: controller, 
+                valueListenable: controller,
                 builder: ((context, value, child) {
                   int minute = controller.value.position.inMinutes;
                   int second = controller.value.position.inSeconds % 60;
@@ -223,3 +251,4 @@ class _MyAppState extends State<MyApp> {
 [2]: https://pub.dev/packages/video_player_control_panel "video_player_control_panel"
 [3]: https://codecguide.com/ "K-Lite Codec Pack"
 [4]: https://www.windows10codecpack.com/ "Windows 10 Codec Pack"
+[5]: https://pub.dev/packages/webview_win_floating "webview_win_floating"

@@ -1,3 +1,7 @@
+## 1.0.3
+
+* modify README.md
+
 ## 1.0.2
 
 * Fix SetLooping()
