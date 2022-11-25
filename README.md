@@ -29,10 +29,23 @@ This package use texture to display video, so play 4K or 60fps video should be s
 
 You can try [webview_win_floating][5] to play 4K video by webview on Windows. It use native WebView2 component. If your PC can play 4K video on Microsoft Edge, it may be playable on [webview_win_floating][5] too.
 
+## Advantages & Limitations
+
+This package use native Media Foundation API pre-built in Windows OS. So:
+
+- No GPL / LGPL 3rd-party library needed.
+- only one dll file (about 128 KB) added as a plugin.
+
+But, as a trade-off, there are some limtations:
+
+- Playback will use codecs preloaded in Windows OS. If you want to play some video format that not supported by these preloaded codecs, you need to install 3rd-party codecs exe file, about 18 MB. (see the next section).
+
+And, this package display video frames by texture, so it may cost more CPU (in my 720p video file, cost about 20% CPU loading in my 9-years-old slow $70 AMD A8-5600K CPU, where WMP cost about 2%, and another well-known package cost about 15%).
+
 ## Supported Formats in Windows (Important !)
 
-This package use Windows built-in Media Foundation API. Lightweight !
-The playback use the codecs preload in your Windows environment.
+This package use Windows built-in Media Foundation API.
+So playback video will use the codecs preload in your Windows environment.
 All the media format can be played by WMP (Windows Media Player) can also be played by this package.
 However, the preloaded codecs in Windows is limited.
 
