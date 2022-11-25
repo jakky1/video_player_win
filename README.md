@@ -4,7 +4,7 @@
 
 [visits-count-image]: https://img.shields.io/badge/dynamic/json?label=Visits%20Count&query=value&url=https://api.countapi.xyz/hit/jakky1_video_player_win/visits
 
-Video player for Windows, lightweight, using Windows built-in Media Foundation API.
+Flutter Video player for Windows, lightweight, using Windows built-in Media Foundation API.
 Windows implementation of the [video_player][1] plugin.
 
 ## Platform Support

@@ -87,7 +87,7 @@ private:
 
   void OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
       LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
-      DWORD dwSampleSize) 
+      DWORD dwSampleSize)
   {
       if (textureId == -1) return; //player maybe shutdown or deleted
       uint64_t now = getCurrentTime();
@@ -161,8 +161,8 @@ void destroyPlayerById(int64_t textureId) {
     texture_registar_->UnregisterTexture(data->textureId);
     data->textureId = -1;
   }
-  
-  // NOTE: because m_pSession->BeginGetEvent(this) will keep *this (player), 
+
+  // NOTE: because m_pSession->BeginGetEvent(this) will keep *this (player),
   //       so we need to call m_pSession->Shutdown() first
   //       then client call player->Release() will make refCount = 0
   data->Shutdown();
@@ -284,7 +284,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     player->SetVolume((float)volume);
     result->Success(flutter::EncodableValue(true));
   } else if (method_call.method_name().compare("reset") == 0) {
-    player->Shutdown();    
+    player->Shutdown();
     result->Success(flutter::EncodableValue(true));
   } else if (method_call.method_name().compare("destroy") == 0) {
     destroyPlayerById(textureId);

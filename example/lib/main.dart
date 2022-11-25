@@ -48,14 +48,14 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('video_player_win example app'),
         ),
-        
+
         body: Stack(children: [
           WinVideoPlayer(controller),
           Positioned(
             bottom: 0,
             child: Column(children: [
               ValueListenableBuilder(
-                valueListenable: controller, 
+                valueListenable: controller,
                 builder: ((context, value, child) {
                   int minute = controller.value.position.inMinutes;
                   int second = controller.value.position.inSeconds % 60;
