@@ -15,7 +15,7 @@ abstract class VideoPlayerWinPlatform extends PlatformInterface {
   ///
   /// Defaults to [MethodChannelVideoPlayerWin].
   static VideoPlayerWinPlatform get instance => _instance;
-  
+
   /// Platform-specific implementations should set this with their own
   /// platform-specific class that extends [VideoPlayerWinPlatform] when
   /// they register themselves.
@@ -69,11 +69,7 @@ abstract class VideoPlayerWinPlatform extends PlatformInterface {
     throw UnimplementedError('setVolume() has not been implemented.');
   }
 
-  Future<void> reset(int textureId) {
-    throw UnimplementedError('reset() has not been implemented.');
-  }
-
-  Future<void> destroy(int textureId) {
+  Future<void> dispose(int textureId) {
     throw UnimplementedError('destroy() has not been implemented.');
   }
 }

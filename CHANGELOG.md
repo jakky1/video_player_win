@@ -1,3 +1,8 @@
+## 1.1.0
+
+* fix crash issue
+* fix memory leak
+
 ## 1.0.4
 
 * modify README.md

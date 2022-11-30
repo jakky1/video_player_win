@@ -39,7 +39,18 @@ public:
   ~MyPlayerInternal() {
     if (m_pBuffer != NULL) delete m_pBuffer;
     m_pBuffer = NULL;
+    textureId = -1;
   }
+
+	inline STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
+    return MyPlayer::QueryInterface(riid, ppv);
+	}
+	inline STDMETHODIMP_(ULONG) AddRef() {
+		return MyPlayer::AddRef();
+	}
+	STDMETHODIMP_(ULONG) Release() {
+		return MyPlayer::Release();
+	}
 
 private:
   uint64_t lastFrameTime = 0;
@@ -112,7 +123,6 @@ private:
       BYTE *pDst = m_pBuffer;
       BYTE *pDstEnd = pDst + dwSampleSize;
       do {
-        if (textureId == -1) break;
         *(pDst++) = *(pSrc--);
         *(pDst++) = *(pSrc--);
         *(pDst) = *(pSrc);
@@ -128,6 +138,7 @@ private:
 };
 
 std::map<int64_t, MyPlayerInternal*> playerMap; // textureId -> MyPlayerInternal*
+std::mutex mapMutex;
 bool isMFInited = false;
 
 void createTexture(MyPlayerInternal* data) {
@@ -140,6 +151,7 @@ void createTexture(MyPlayerInternal* data) {
 }
 
 MyPlayerInternal* getPlayerById(int64_t textureId, bool autoCreate = false) {
+  std::lock_guard<std::mutex> lock(mapMutex);
   MyPlayerInternal* data = playerMap[textureId];
   if (data == NULL && autoCreate) {
     if (!isMFInited) {
@@ -154,6 +166,7 @@ MyPlayerInternal* getPlayerById(int64_t textureId, bool autoCreate = false) {
 }
 
 void destroyPlayerById(int64_t textureId) {
+  std::lock_guard<std::mutex> lock(mapMutex);
   MyPlayerInternal* data = playerMap[textureId];
   if (data == NULL) return;
   playerMap.erase(textureId);
@@ -162,10 +175,6 @@ void destroyPlayerById(int64_t textureId) {
     data->textureId = -1;
   }
 
-  // NOTE: because m_pSession->BeginGetEvent(this) will keep *this (player),
-  //       so we need to call m_pSession->Shutdown() first
-  //       then client call player->Release() will make refCount = 0
-  data->Shutdown();
   data->Release();
 }
 
@@ -201,10 +210,12 @@ VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {
   texture_registar_ = NULL; //Jacky
   MFShutdown();
 }
+
 void VideoPlayerWinPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 
+  //std::cout << "HandleMethodCall: " << method_call.method_name() << std::endl;
   flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
 
   auto textureId = arguments[flutter::EncodableValue("textureId")].LongValue();
@@ -283,10 +294,13 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     double volume = std::get<double>(arguments[flutter::EncodableValue("volume")]);
     player->SetVolume((float)volume);
     result->Success(flutter::EncodableValue(true));
-  } else if (method_call.method_name().compare("reset") == 0) {
+  } else if (method_call.method_name().compare("shutdown") == 0) {
+    // NOTE: because m_pSession->BeginGetEvent(this) will keep *this (player),
+    //       so we need to call m_pSession->Shutdown() first
+    //       then client call player->Release() will make refCount = 0
     player->Shutdown();
     result->Success(flutter::EncodableValue(true));
-  } else if (method_call.method_name().compare("destroy") == 0) {
+  } else if (method_call.method_name().compare("dispose") == 0) {
     destroyPlayerById(textureId);
     result->Success(flutter::EncodableValue(true));
   } else {

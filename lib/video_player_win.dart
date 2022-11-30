@@ -26,20 +26,20 @@ class WinVideoPlayerValue {
   double get aspectRatio => size.isEmpty ? 1 : size.width / size.height;
 
   WinVideoPlayerValue({
-    this.duration = Duration.zero, 
+    this.duration = Duration.zero,
     this.hasError = false,
-    this.size = Size.zero, 
-    this.position = Duration.zero, 
-    //Caption caption = Caption.none, 
-    //Duration captionOffset = Duration.zero, 
-    //List<DurationRange> buffered = const <DurationRange>[], 
-    this.isInitialized = false, 
-    this.isPlaying = false, 
-    this.isLooping = false, 
-    this.isBuffering = false, 
-    this.volume = 1.0, 
-    this.playbackSpeed = 1.0, 
-    //int rotationCorrection = 0, 
+    this.size = Size.zero,
+    this.position = Duration.zero,
+    //Caption caption = Caption.none,
+    //Duration captionOffset = Duration.zero,
+    //List<DurationRange> buffered = const <DurationRange>[],
+    this.isInitialized = false,
+    this.isPlaying = false,
+    this.isLooping = false,
+    this.isBuffering = false,
+    this.volume = 1.0,
+    this.playbackSpeed = 1.0,
+    //int rotationCorrection = 0,
     //String? errorDescription
   });
 
@@ -75,10 +75,10 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   final String dataSource;
   late final WinDataSourceType dataSourceType;
   bool _isLooping = false;
-  
+
   final _eventStreamController = StreamController<VideoEvent>(); // used for flutter official "video_player" package
   Stream<VideoEvent> get videoEventStream => _eventStreamController.stream;
-  
+
   Future<Duration?> get position => Future.value(value.position);
 
   WinVideoPlayerController._(this.dataSource, this.dataSourceType) : super(WinVideoPlayerValue())  {
@@ -111,7 +111,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     delay = delay ~/ value.playbackSpeed + 1;
     await Future.delayed(Duration(milliseconds: delay));
 
-    // NOTE: DO NOT call getCurrentPosition() during seeking, because windows will return 0...   
+    // NOTE: DO NOT call getCurrentPosition() during seeking, because windows will return 0...
     if (textureId_ == -1 || !value.isInitialized || !value.isPlaying || (seekId != _lastSeekId)) return;
 
     var pos = await _getCurrentPosition();
@@ -217,7 +217,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         completer = Completer();
         _lastSeekFuture = completer!.future;
       }
-      
+
       _seekTimer?.cancel();
       _seekTimer = Timer(const Duration(milliseconds: 300), () async {
         _cancelTrackingPosition();
@@ -241,13 +241,13 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
             seekTo(Duration(milliseconds: _lastSeekPos)).then((_) {
               completer!.complete();
             });
-            _lastSeekPos = -1;          
-          }        
+            _lastSeekPos = -1;
+          }
         });
-        
+
         _cancelTrackingPosition();
         return VideoPlayerWinPlatform.instance.seekTo(textureId_, time.inMilliseconds);
-      }      
+      }
     }
   }
 
@@ -281,7 +281,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     value = value.copyWith(isInitialized: false, isPlaying: false);
 
     VideoPlayerWinPlatform.instance.unregisterPlayer(textureId_);
-    await VideoPlayerWinPlatform.instance.destroy(textureId_);
+    await VideoPlayerWinPlatform.instance.dispose(textureId_);
+    _cancelTrackingPosition();
 
     log("flutter: video player dispose: id=$textureId_");
   }
@@ -292,7 +293,7 @@ class WinVideoPlayer extends StatefulWidget {
   final FilterQuality filterQuality;
 
   // ignore: unused_element
-  const WinVideoPlayer(this.controller, {Key? key, this.filterQuality = FilterQuality.low}) 
+  const WinVideoPlayer(this.controller, {Key? key, this.filterQuality = FilterQuality.low})
     : super(key: key);
 
   @override
@@ -322,6 +323,6 @@ class _WinVideoPlayerState extends State<WinVideoPlayer> {
             ),
         ),
       ),
-    );      
+    );
   }
 }

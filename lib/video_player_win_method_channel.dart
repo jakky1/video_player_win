@@ -53,16 +53,16 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
     int width = arguments["videoWidth"];
     int height = arguments["videoHeight"];
     double volume = arguments["volume"];
-    var value = WinVideoPlayerValue(    
-      position: Duration.zero,  
+    var value = WinVideoPlayerValue(
+      position: Duration.zero,
       duration: Duration(milliseconds: arguments["duration"]),
       size: Size(width.toDouble(), height.toDouble()),
       isPlaying: false,
-      hasError: false, 
+      hasError: false,
       isInitialized: true,
       volume: volume,
     );
-    
+
     value.textureId = arguments["textureId"];
     playerMap[value.textureId] = player;
     return value;
@@ -108,12 +108,10 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
   }
 
   @override
-  Future<void> reset(int textureId) async {
-    await methodChannel.invokeMethod<bool>('reset', { "textureId": textureId });
-  }
-
-  @override
-  Future<void> destroy(int textureId) async {
-    await methodChannel.invokeMethod<bool>('destroy', { "textureId": textureId });
+  Future<void> dispose(int textureId) async {
+    await methodChannel.invokeMethod<bool>('shutdown', { "textureId": textureId });
+    // NOTE: delay some time to wait last callbacks finished
+    await Future.delayed(const Duration(milliseconds: 3000));
+    await methodChannel.invokeMethod<bool>('dispose', { "textureId": textureId });
   }
 }

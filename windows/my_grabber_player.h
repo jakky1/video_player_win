@@ -5,10 +5,11 @@
 #include <mfapi.h>
 #include <audiopolicy.h>
 #include <functional>
+#include <mutex>
 
 #include <wil/com.h>
 
-class MyPlayerCallback
+class MyPlayerCallback : public IUnknown
 {
 public:
 	virtual void OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
@@ -60,6 +61,7 @@ protected:
 	virtual void OnPlayerEvent(MediaEventType event) {};
 	HRESULT CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMediaSource* pSource)> callback);
 
+	std::mutex m_mutex;
 	UINT32 m_VideoWidth;
 	UINT32 m_VideoHeight;
 
@@ -69,6 +71,9 @@ private:
 	void cancelAsyncLoad();
 
 	wil::com_ptr<IMFMediaSession> m_pSession;
+	wil::com_ptr<IMFMediaSource> m_pMediaSource;
+	wil::com_ptr<IMFActivate> m_pVideoSinkActivate;
+    wil::com_ptr<IMFActivate> m_pAudioRendererActivate;
 	wil::com_ptr<ISimpleAudioVolume> m_pSimpleAudioVolume;
 	wil::com_ptr<IMFPresentationClock> m_pClock;
 	wil::com_ptr<IMFRateControl> m_pRate;

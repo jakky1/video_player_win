@@ -8,7 +8,7 @@ import 'video_player_win.dart';
 import 'video_player_win_platform_interface.dart';
 
 class WindowsVideoPlayer extends VideoPlayerPlatform {
-  
+
   static void registerWith() {
     VideoPlayerPlatform.instance = WindowsVideoPlayer();
   }
@@ -22,7 +22,7 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
   /// Clears one video.
   @override
   Future<void> dispose(int textureId) async {
-    await VideoPlayerWinPlatform.instance.destroy(textureId);
+    await VideoPlayerWinPlatform.instance.dispose(textureId);
   }
 
   /// Creates an instance of a video player and returns its textureId.
@@ -38,7 +38,7 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
       return controller.textureId_ > 0 ? controller.textureId_ : null;
     } else {
       throw UnimplementedError('create() has not been implemented for dataSource type [assets] and [contentUri] in Windows OS');
-    }    
+    }
   }
 
   /// Returns a Stream of [VideoEventType]s.

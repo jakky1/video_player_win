@@ -10,7 +10,7 @@
 //#include <mfidl.h>
 #include <mfreadwrite.h>
 #include <new>
-#include <stdio.h>
+#include <iostream>
 
 #include <mmdeviceapi.h>
 #include <audiopolicy.h>
@@ -25,7 +25,7 @@
 
 class CAsyncCallback : public IMFAsyncCallback
 {
-    // ref: https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/DX11VideoRenderer/cpp/Common.h       
+    // ref: https://github.com/microsoft/Windows-classic-samples/blob/main/Samples/DX11VideoRenderer/cpp/Common.h
 public:
 
     typedef std::function<HRESULT(IMFAsyncResult*)> InvokeFn;
@@ -92,7 +92,7 @@ private:
 class SampleGrabberCB : public IMFSampleGrabberSinkCallback
 {
     long m_cRef;
-    MyPlayerCallback* m_pUserCallback = NULL;
+    wil::com_ptr<MyPlayerCallback> m_pUserCallback;
 
     SampleGrabberCB() : m_cRef(1) {}
 
@@ -137,6 +137,7 @@ MyPlayer::MyPlayer() :
 MyPlayer::~MyPlayer()
 {
     Shutdown();
+    std::cout << "[native] ~MyPlayer()" << std::endl;
 }
 
 HRESULT MyPlayer::initAudioVolume()
@@ -188,11 +189,9 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
     HRESULT hr = CreateMediaSourceAsync(pszFileName, [=](IMFMediaSource* pSource) -> void {
         HRESULT hr;
         wil::com_ptr<SampleGrabberCB> pCallback;
-        wil::com_ptr<IMFActivate> pSinkActivate;
         wil::com_ptr<IMFTopology> pTopology;
         wil::com_ptr<IMFMediaType> pType;
         wil::com_ptr<IMFClock> pClock;
-        wil::com_ptr<IMFMediaSource> pMediaSource;
 
         if (this->Release() <= 0 || pSource == NULL) {
             //load fail or abort
@@ -200,7 +199,7 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
             loadCallback(false);
             return; // *this* maybe already deleted, so don't access any *this members, and return immediately!
         }
-        pMediaSource = pSource;
+        m_pMediaSource = pSource;
         pSource = NULL;
 
         // Configure the media type that the Sample Grabber will receive.
@@ -217,21 +216,21 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
             // Create the sample grabber sink.
             CHECK_HR(hr = SampleGrabberCB::CreateInstance(&pCallback));
             pCallback->SetUserCallback(playerCallback);
-            CHECK_HR(hr = MFCreateSampleGrabberSinkActivate(pType.get(), pCallback.get(), &pSinkActivate)); //Jacky
+            CHECK_HR(hr = MFCreateSampleGrabberSinkActivate(pType.get(), pCallback.get(), &m_pVideoSinkActivate)); //Jacky
         }
         else
         {
-            CHECK_HR(hr = MFCreateVideoRendererActivate(hwndVideo, &pSinkActivate)); //Jacky
+            CHECK_HR(hr = MFCreateVideoRendererActivate(hwndVideo, &m_pVideoSinkActivate)); //Jacky
         }
 
         // To run as fast as possible, set this attribute (requires Windows 7):
-        CHECK_HR(hr = pSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, FALSE)); //Jacky
+        CHECK_HR(hr = m_pVideoSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, FALSE)); //Jacky
 
         // Create the Media Session.
         CHECK_HR(hr = MFCreateMediaSession(NULL, &m_pSession));
 
         // Create the topology.
-        CHECK_HR(hr = CreateTopology(pMediaSource.get(), pSinkActivate.get(), &pTopology));
+        CHECK_HR(hr = CreateTopology(m_pMediaSource.get(), m_pVideoSinkActivate.get(), &pTopology));
 
         // Run the media session.
         CHECK_HR(hr = m_pSession->SetTopology(0, pTopology.get()));
@@ -347,15 +346,24 @@ HRESULT MyPlayer::SetMute(bool bMute)
 
 void MyPlayer::Shutdown()
 {
+    std::unique_lock<std::mutex> guard(m_mutex);
     if (m_isShutdown) return;
     m_isShutdown = true;
     m_hnsDuration = -1;
     cancelAsyncLoad();
 
-    // NOTE: because m_pSession->BeginGetEvent(this) will keep *this, 
+    // NOTE: because m_pSession->BeginGetEvent(this) will keep *this,
     //       so we need to call m_pSession->Shutdown() first
     //       then client call player->Release() will make refCount = 0
-    if (m_pSession) m_pSession->Shutdown();
+    if (m_pSession) {
+        m_pSession->Stop();
+        m_pSession->Close();
+
+        m_pSession->Shutdown();
+        m_pMediaSource->Shutdown();
+        m_pVideoSinkActivate->ShutdownObject();
+        m_pAudioRendererActivate->ShutdownObject();
+    }
 }
 
 void MyPlayer::cancelAsyncLoad() {
@@ -373,11 +381,13 @@ HRESULT MyPlayer::GetParameters(DWORD* pdwFlags, DWORD* pdwQueue)
 
 HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
 {
+    std::unique_lock<std::mutex> guard(m_mutex);
+    wil::com_ptr<MyPlayer> thisRef(this);
     HRESULT hr;
     wil::com_ptr<IMFMediaEvent> pEvent;
     MediaEventType meType = MEUnknown;
 
-    if (m_pSession == NULL) return E_FAIL;
+    if (m_isShutdown || m_pSession == NULL) return E_FAIL;
     CHECK_HR(hr = m_pSession->EndGetEvent(pResult, &pEvent));
     CHECK_HR(hr = pEvent->GetType(&meType));
     CHECK_HR(hr = m_pSession->BeginGetEvent(this, NULL));
@@ -516,7 +526,6 @@ HRESULT MyPlayer::CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActi
     wil::com_ptr<IMFTopologyNode> pNodeSrc; // source node
     wil::com_ptr<IMFTopologyNode> pNodeVideoSink; // video node
     wil::com_ptr<IMFTopologyNode> pNodeAudioSink; // audio node
-    wil::com_ptr<IMFActivate> pRendererActivate; //Jacky
     wil::com_ptr<IMFMediaType> pVideoMediaType;
     bool isSourceAdded = false;
 
@@ -564,8 +573,8 @@ HRESULT MyPlayer::CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActi
                 CHECK_HR(hr = AddSourceNode(pTopology.get(), pSource, pPD.get(), pSD.get(), &pNodeSrc));
                 isSourceAdded = true;
             }
-            CHECK_HR(hr = MFCreateAudioRendererActivate(&pRendererActivate));
-            CHECK_HR(hr = AddOutputNode(pTopology.get(), pRendererActivate.get(), 0, &pNodeAudioSink));
+            CHECK_HR(hr = MFCreateAudioRendererActivate(&m_pAudioRendererActivate));
+            CHECK_HR(hr = AddOutputNode(pTopology.get(), m_pAudioRendererActivate.get(), 0, &pNodeAudioSink));
             CHECK_HR(hr = pNodeSrc->ConnectOutput(0, pNodeAudioSink.get(), 0));
 
             /* Jacky test, try to get volume control fail... {
@@ -638,7 +647,7 @@ STDMETHODIMP_(ULONG) SampleGrabberCB::Release()
 
 // IMFClockStateSink methods.
 
-// In these example, the IMFClockStateSink methods do not perform any actions. 
+// In these example, the IMFClockStateSink methods do not perform any actions.
 // You can use these methods to track the state of the sample grabber sink.
 
 STDMETHODIMP SampleGrabberCB::OnClockStart(MFTIME hnsSystemTime, LONGLONG llClockStartOffset)
@@ -677,6 +686,7 @@ STDMETHODIMP SampleGrabberCB::OnProcessSample(REFGUID guidMajorMediaType, DWORD 
     LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
     DWORD dwSampleSize)
 {
+    if (m_pUserCallback.get() == NULL) return S_OK;
     m_pUserCallback->OnProcessSample(guidMajorMediaType, dwSampleFlags,
         llSampleTime, llSampleDuration, pSampleBuffer,
         dwSampleSize);
@@ -685,5 +695,6 @@ STDMETHODIMP SampleGrabberCB::OnProcessSample(REFGUID guidMajorMediaType, DWORD 
 
 STDMETHODIMP SampleGrabberCB::OnShutdown()
 {
+    m_pUserCallback.reset();
     return S_OK;
 }
