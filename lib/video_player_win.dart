@@ -134,12 +134,12 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         _eventStreamController.add(VideoEvent(eventType: VideoEventType.bufferingEnd));
         break;
       case 3: // MESessionStarted , occurs when user call play() or seekTo() in playing mode
-        log("[video_player_win] playback event: playing");
+        //log("[video_player_win] playback event: playing");
         value = value.copyWith(isInitialized: true, isPlaying: true);
         _startTrackingPosition(_lastSeekId);
         break;
       case 4: // MESessionPaused
-        log("[video_player_win] playback event: paused");
+        //log("[video_player_win] playback event: paused");
         value = value.copyWith(isPlaying: false);
         break;
       case 5: // MESessionStopped
