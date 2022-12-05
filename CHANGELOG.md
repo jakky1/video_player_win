@@ -1,3 +1,7 @@
+## 1.1.1
+
+* change sdk version limitation
+
 ## 1.1.0
 
 * fix crash issue
