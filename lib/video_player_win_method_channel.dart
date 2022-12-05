@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -45,8 +46,10 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
   }
 
   @override
-  Future<WinVideoPlayerValue?> openVideo(WinVideoPlayerController player, int textureId, String path) async {
-    var arguments = await methodChannel.invokeMethod<Map>('openVideo', { "textureId": -1, "path": path });
+  Future<WinVideoPlayerValue?> openVideo(
+      WinVideoPlayerController player, int textureId, String path) async {
+    var arguments = await methodChannel
+        .invokeMethod<Map>('openVideo', {"textureId": -1, "path": path});
     if (arguments == null) return null;
     if (arguments["result"] == false) return null;
 
@@ -70,48 +73,54 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
 
   @override
   Future<void> play(int textureId) async {
-    await methodChannel.invokeMethod<bool>('play', { "textureId": textureId });
+    await methodChannel.invokeMethod<bool>('play', {"textureId": textureId});
   }
 
   @override
   Future<void> pause(int textureId) async {
-    await methodChannel.invokeMethod<bool>('pause', { "textureId": textureId });
+    await methodChannel.invokeMethod<bool>('pause', {"textureId": textureId});
   }
 
   @override
   Future<void> seekTo(int textureId, int ms) async {
     // TODO: will auto play after seek, it seems there is no way to seek without playing in windows media foundation API...
-    await methodChannel.invokeMethod<bool>('seekTo', { "textureId": textureId, "ms": ms });
+    await methodChannel
+        .invokeMethod<bool>('seekTo', {"textureId": textureId, "ms": ms});
   }
 
   @override
   Future<int> getCurrentPosition(int textureId) async {
     // TODO: sometimes will return 0 when seeking... seems a bug in windows media foundation API...
-    var value = await methodChannel.invokeMethod<int>('getCurrentPosition', { "textureId": textureId });
+    var value = await methodChannel
+        .invokeMethod<int>('getCurrentPosition', {"textureId": textureId});
     return value ?? -1;
   }
 
   @override
   Future<int> getDuration(int textureId) async {
-    var value = await methodChannel.invokeMethod<int>('getDuration', { "textureId": textureId });
+    var value = await methodChannel
+        .invokeMethod<int>('getDuration', {"textureId": textureId});
     return value ?? -1;
   }
 
   @override
   Future<void> setPlaybackSpeed(int textureId, double speed) async {
-    await methodChannel.invokeMethod<bool>('setPlaybackSpeed', { "textureId": textureId, "speed": speed });
+    await methodChannel.invokeMethod<bool>(
+        'setPlaybackSpeed', {"textureId": textureId, "speed": speed});
   }
 
   @override
   Future<void> setVolume(int textureId, double volume) async {
-    await methodChannel.invokeMethod<bool>('setVolume', { "textureId": textureId, "volume": volume });
+    await methodChannel.invokeMethod<bool>(
+        'setVolume', {"textureId": textureId, "volume": volume});
   }
 
   @override
   Future<void> dispose(int textureId) async {
-    await methodChannel.invokeMethod<bool>('shutdown', { "textureId": textureId });
+    await methodChannel
+        .invokeMethod<bool>('shutdown', {"textureId": textureId});
     // NOTE: delay some time to wait last callbacks finished
     await Future.delayed(const Duration(milliseconds: 3000));
-    await methodChannel.invokeMethod<bool>('dispose', { "textureId": textureId });
+    await methodChannel.invokeMethod<bool>('dispose', {"textureId": textureId});
   }
 }

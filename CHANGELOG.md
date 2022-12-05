@@ -1,3 +1,7 @@
+## 1.1.2
+
+* fix compile error
+
 ## 1.1.1
 
 * change sdk version limitation
