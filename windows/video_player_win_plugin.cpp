@@ -96,6 +96,14 @@ private:
     gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
   }
 
+  inline BYTE myByteClamp(int value) {
+    BYTE ret;
+    if (value < 0) ret = 0;
+    else if (value > 255) ret = 255;
+    else ret = (BYTE) value;
+    return ret;
+  }
+
   void OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
       LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
       DWORD dwSampleSize)
@@ -108,7 +116,7 @@ private:
       if (m_lastSampleSize != dwSampleSize) {
         m_lastSampleSize = dwSampleSize;
         if (m_pBuffer != NULL) delete m_pBuffer;
-        m_pBuffer = new BYTE[m_lastSampleSize];
+        m_pBuffer = new BYTE[m_VideoWidth * m_VideoHeight * 4];
 
         pixel_buffer.width = m_VideoWidth;
         pixel_buffer.height = m_VideoHeight;
@@ -119,17 +127,54 @@ private:
         pixel_buffer.height = m_VideoHeight;
       }
 
-      const BYTE *pSrc = pSampleBuffer + 2;
-      BYTE *pDst = m_pBuffer;
-      BYTE *pDstEnd = pDst + dwSampleSize;
-      do {
-        *(pDst++) = *(pSrc--);
-        *(pDst++) = *(pSrc--);
-        *(pDst) = *(pSrc);
+      // NV12 -> RGBA
+      const BYTE *ubase = pSampleBuffer + m_VideoWidth * m_VideoHeight;
+      //const BYTE *pU = ubase;
+      for (UINT32 y = 0; y < m_VideoHeight; y+=2) {
+        const BYTE *pY = pSampleBuffer + y * m_VideoWidth;
+        const BYTE *pY2 = pY + m_VideoWidth;
+        BYTE *pDst = m_pBuffer + y * m_VideoWidth * 4;
+        BYTE *pDst2 = pDst + m_VideoWidth * 4;
 
-        pDst += 2;
-        pSrc += (4 + 2);
-      } while (pDst < pDstEnd);
+        const BYTE *ubaseDelta = ubase + y / 2 * m_VideoWidth;
+        for (UINT32 x = 0; x < m_VideoWidth; x+=2) {
+          BYTE Y;
+          int U = (int)ubaseDelta[x] - 128;
+          int V = (int)ubaseDelta[x+1] - 128;
+
+          int dy = (int)(1.402 * V);
+          int du = (int)(- 0.34413 * U - 0.71414 * V);
+          int dv = (int)(1.772 * U);
+
+          Y = *pY;
+          *(pDst++) = myByteClamp(Y + dy);
+          *(pDst++) = myByteClamp(Y + du);
+          *(pDst++) = myByteClamp(Y + dv);
+          pDst++;
+          pY++;
+
+          Y = *pY;
+          *(pDst++) = myByteClamp(Y + dy);
+          *(pDst++) = myByteClamp(Y + du);
+          *(pDst++) = myByteClamp(Y + dv);
+          pDst++;
+          pY++;
+
+          Y = *pY2;
+          *(pDst2++) = myByteClamp(Y + dy);
+          *(pDst2++) = myByteClamp(Y + du);
+          *(pDst2++) = myByteClamp(Y + dv);
+          pDst2++;
+          pY2++;
+
+          Y = *pY2;
+          *(pDst2++) = myByteClamp(Y + dy);
+          *(pDst2++) = myByteClamp(Y + du);
+          *(pDst2++) = myByteClamp(Y + dv);
+          pDst2++;
+          pY2++;
+        }
+      }
 
       if (texture_registar_ != NULL && textureId != -1) {
         texture_registar_->MarkTextureFrameAvailable(textureId);

@@ -208,7 +208,7 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
 
         CHECK_HR(hr = MFCreateMediaType(&pType));
         CHECK_HR(hr = pType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video));
-        CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32)); //OK
+        CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12)); //OK
         //CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32)); //fail
 
         if (playerCallback != NULL) //Jacky
@@ -392,7 +392,7 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
     CHECK_HR(hr = pEvent->GetType(&meType));
     CHECK_HR(hr = m_pSession->BeginGetEvent(this, NULL));
 
-    //printf("native player event: %d", meType);
+    //std::cout << "native player event: " << meType << std::endl;
     switch (meType) {
     case MESessionStarted:
     case MEBufferingStarted:
