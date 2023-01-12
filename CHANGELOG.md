@@ -1,3 +1,7 @@
+## 1.1.4
+
+* Fix crash when dispose video which has no audio or video stream
+
 ## 1.1.3
 
 * support AV1 video
