@@ -40,8 +40,6 @@ But, as a trade-off, there are some limtations:
 
 - Playback will use codecs preloaded in Windows OS. If you want to play some video format that not supported by these preloaded codecs, you need to install 3rd-party codecs exe file, about 18 MB. (see the next section).
 
-And, this package display video frames by texture, so it may cost more CPU (in my 720p video file, cost about 20% CPU loading in my 9-years-old slow $70 AMD A8-5600K CPU, where WMP cost about 2%, and another well-known package cost about 15%).
-
 ## Supported Formats in Windows (Important !)
 
 This package use Windows built-in Media Foundation API.
@@ -55,11 +53,7 @@ In this case, please install ONE of the following codec pack into your Windows:
 - [K-Lite codec pack][3]
 - [Windows 10 Codec Pack][4]
 
-You can also auto-install for users when your application first launched by the following sample command:
-```
-shell>  K-Lite_Codec_Pack_1730_Basic.exe /silent
-```
-with the following sample Dart code:
+You can auto-install codec by the following Dart code:
 ```
 import 'dart:io';
 
@@ -71,6 +65,21 @@ Process.run('E:\\K-Lite_Codec_Pack_1730_Basic.exe', ['/silent']).then((value) {
 
 After install the codec pack, most of the media format are supported.
 
+## Supported AV1 video
+
+To play AV1 video,
+- install codec in [Microsoft Store][7].
+- or download the [AV1 codec installer][6] (only 850 KB)
+
+You can silently auto-install codec by the following Dart code:
+```
+import 'dart:io';
+
+Process.run('powershell', ['Add-AppxPackage', '-Path', 'E:\\av1-video-extension-1-1-52851-0.appx']).then((value) {
+  if (value.exitCode == 0) log("installation success");
+  else log("installation failed");
+});
+```
 
 ## Quick Start
 
@@ -265,3 +274,5 @@ class _MyAppState extends State<MyApp> {
 [3]: https://codecguide.com/ "K-Lite Codec Pack"
 [4]: https://www.windows10codecpack.com/ "Windows 10 Codec Pack"
 [5]: https://pub.dev/packages/webview_win_floating "webview_win_floating"
+[6]: https://av1-video-extension.en.uptodown.com/windows "AV1 codec installer"
+[7]: https://apps.microsoft.com/store/detail/av1-video-extension/9MVZQVXJBQ9V?hl=en-us&gl=us "Microsoft Store AV1 codec"

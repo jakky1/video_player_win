@@ -1,3 +1,8 @@
+## 1.1.3
+
+* support AV1 video
+* enhance playback performance
+
 ## 1.1.2
 
 * fix compile error
