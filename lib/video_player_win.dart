@@ -274,15 +274,14 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
   @override
   Future<void> dispose() async {
-    super.dispose();
+    VideoPlayerWinPlatform.instance.unregisterPlayer(textureId_);
+    await VideoPlayerWinPlatform.instance.dispose(textureId_);
+    _cancelTrackingPosition();
 
     textureId_ = -1;
     value.textureId = -1;
     value = value.copyWith(isInitialized: false, isPlaying: false);
-
-    VideoPlayerWinPlatform.instance.unregisterPlayer(textureId_);
-    await VideoPlayerWinPlatform.instance.dispose(textureId_);
-    _cancelTrackingPosition();
+    super.dispose();
 
     log("flutter: video player dispose: id=$textureId_");
   }
