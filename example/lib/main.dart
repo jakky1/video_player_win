@@ -16,16 +16,14 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  WinVideoPlayerController? controller;
 
-  late WinVideoPlayerController controller;
-
-  @override
-  void initState() {
-    super.initState();
+  void reload() {
+    controller?.dispose();
     controller = WinVideoPlayerController.file(File("E:\\test_youtube.mp4"));
-    controller.initialize().then((value) {
-      if (controller.value.isInitialized) {
-        controller.play();
+    controller!.initialize().then((value) {
+      if (controller!.value.isInitialized) {
+        controller!.play();
         setState(() {});
       } else {
         log("video file load failed");
@@ -33,12 +31,19 @@ class _MyAppState extends State<MyApp> {
     }).catchError((e) {
       log("controller.initialize() error occurs: $e");
     });
+    setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    reload();
   }
 
   @override
   void dispose() {
     super.dispose();
-    controller.dispose();
+    controller?.dispose();
   }
 
   @override
@@ -48,24 +53,37 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('video_player_win example app'),
         ),
-
         body: Stack(children: [
-          WinVideoPlayer(controller),
+          WinVideoPlayer(controller!),
           Positioned(
-            bottom: 0,
-            child: Column(children: [
-              ValueListenableBuilder(
-                valueListenable: controller,
-                builder: ((context, value, child) {
-                  int minute = controller.value.position.inMinutes;
-                  int second = controller.value.position.inSeconds % 60;
-                  return Text("$minute:$second", style: Theme.of(context).textTheme.headline6!.copyWith(color: Colors.white, backgroundColor: Colors.black54));
-                }),
-              ),
-              ElevatedButton(onPressed: () => controller.play(), child: const Text("Play")),
-              ElevatedButton(onPressed: () => controller.pause(), child: const Text("Pause")),
-              ElevatedButton(onPressed: () => controller.seekTo(Duration(milliseconds: controller.value.position.inMilliseconds+ 10*1000)), child: const Text("Forward")),
-            ])),
+              bottom: 0,
+              child: Column(children: [
+                ValueListenableBuilder<WinVideoPlayerValue>(
+                  valueListenable: controller!,
+                  builder: ((context, value, child) {
+                    int minute = value.position.inMinutes;
+                    int second = value.position.inSeconds % 60;
+                    return Text("$minute:$second",
+                        style: Theme.of(context).textTheme.headline6!.copyWith(
+                            color: Colors.white,
+                            backgroundColor: Colors.black54));
+                  }),
+                ),
+                ElevatedButton(
+                    onPressed: () => reload(),
+                    child: const Text("Reload")),
+                ElevatedButton(
+                    onPressed: () => controller?.play(),
+                    child: const Text("Play")),
+                ElevatedButton(
+                    onPressed: () => controller?.pause(),
+                    child: const Text("Pause")),
+                ElevatedButton(
+                    onPressed: () => controller?.seekTo(Duration(
+                        milliseconds: controller!.value.position.inMilliseconds +
+                            10 * 1000)),
+                    child: const Text("Forward")),
+              ])),
         ]),
       ),
     );
