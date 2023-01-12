@@ -96,14 +96,6 @@ private:
     gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
   }
 
-  inline BYTE myByteClamp(int value) {
-    BYTE ret;
-    if (value < 0) ret = 0;
-    else if (value > 255) ret = 255;
-    else ret = (BYTE) value;
-    return ret;
-  }
-
   void OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
       LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
       DWORD dwSampleSize)
@@ -116,7 +108,7 @@ private:
       if (m_lastSampleSize != dwSampleSize) {
         m_lastSampleSize = dwSampleSize;
         if (m_pBuffer != NULL) delete m_pBuffer;
-        m_pBuffer = new BYTE[m_VideoWidth * m_VideoHeight * 4];
+        m_pBuffer = new BYTE[m_VideoWidth * (m_VideoHeight + 1) * 4 + 10]; // height + 1 to avoid crash for odd width/height video
 
         pixel_buffer.width = m_VideoWidth;
         pixel_buffer.height = m_VideoHeight;
@@ -142,37 +134,27 @@ private:
           int U = (int)ubaseDelta[x] - 128;
           int V = (int)ubaseDelta[x+1] - 128;
 
-          int dy = (int)(1.402 * V);
-          int du = (int)(- 0.34413 * U - 0.71414 * V);
-          int dv = (int)(1.772 * U);
+          int dy = (1435 * V) >> 10;
+          int du = (- 352 * U - 731 * V) >> 10;
+          int dv = (1814 * U) >> 10;
 
-          Y = *pY;
-          *(pDst++) = myByteClamp(Y + dy);
-          *(pDst++) = myByteClamp(Y + du);
-          *(pDst++) = myByteClamp(Y + dv);
-          pDst++;
-          pY++;
+          int tmp;
+          #define myByteClamp(dst, value)  \
+            tmp = value;                        \
+            dst = tmp < 0 ? 0 : tmp > 255 ? 255 : (BYTE)tmp;
 
-          Y = *pY;
-          *(pDst++) = myByteClamp(Y + dy);
-          *(pDst++) = myByteClamp(Y + du);
-          *(pDst++) = myByteClamp(Y + dv);
-          pDst++;
-          pY++;
+          // ref: https://zhuanlan.zhihu.com/p/397551265
+          #define _convert(pY, pDst)            \
+            Y = *(pY++);                      \
+            myByteClamp(*(pDst++), Y + dy);   \
+            myByteClamp(*(pDst++), Y + du);   \
+            myByteClamp(*(pDst++), Y + dv);   \
+            pDst++;
 
-          Y = *pY2;
-          *(pDst2++) = myByteClamp(Y + dy);
-          *(pDst2++) = myByteClamp(Y + du);
-          *(pDst2++) = myByteClamp(Y + dv);
-          pDst2++;
-          pY2++;
-
-          Y = *pY2;
-          *(pDst2++) = myByteClamp(Y + dy);
-          *(pDst2++) = myByteClamp(Y + du);
-          *(pDst2++) = myByteClamp(Y + dv);
-          pDst2++;
-          pY2++;
+          _convert(pY, pDst); //X0Y0
+          _convert(pY, pDst); //X1Y0
+          _convert(pY2, pDst2); //X0Y1
+          _convert(pY2, pDst2); //X1Y1
         }
       }
 
