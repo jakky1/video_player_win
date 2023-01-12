@@ -361,8 +361,8 @@ void MyPlayer::Shutdown()
 
         m_pSession->Shutdown();
         m_pMediaSource->Shutdown();
-        m_pVideoSinkActivate->ShutdownObject();
-        m_pAudioRendererActivate->ShutdownObject();
+        if (m_pVideoSinkActivate.get() != NULL) m_pVideoSinkActivate->ShutdownObject();
+        if (m_pAudioRendererActivate.get() != NULL) m_pAudioRendererActivate->ShutdownObject();
     }
 }
 
