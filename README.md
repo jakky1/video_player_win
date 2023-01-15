@@ -81,9 +81,16 @@ Process.run('powershell', ['Add-AppxPackage', '-Path', 'E:\\av1-video-extension-
 });
 ```
 
-## Quick Start
+# Problem shootting for building fail
 
-### Installation
+If you build fail with this package, and the error message has the keyword "**MSB3073**":
+
+- run "**flutter build .**" in command line in [**Administrator**] mode
+
+
+# Quick Start
+
+## Installation
 
 Add this to your package's `pubspec.yaml` file:
 
