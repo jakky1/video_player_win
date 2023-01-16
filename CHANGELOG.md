@@ -1,3 +1,8 @@
+## 1.1.5
+
+* Fix video skew when width or height is not multiple of 16
+
+
 ## 1.1.4
 
 * Fix crash when dispose video which has no audio or video stream
