@@ -124,6 +124,9 @@ private:
       #define ALIGN16(v) ((v+15)&~15)
       UINT32 strideW = ALIGN16(m_VideoWidth);
       UINT32 strideH = ALIGN16(m_VideoHeight);
+      if (strideW * strideH * 3 / 2 > dwSampleSize) {
+        strideH = m_VideoHeight; //workaround, why sometimes height is no need to align ?
+      }
 
       const BYTE *ubase = pSampleBuffer + strideW * strideH;
       //const BYTE *pU = ubase;
