@@ -120,15 +120,20 @@ private:
       }
 
       // NV12 -> RGBA
-      const BYTE *ubase = pSampleBuffer + m_VideoWidth * m_VideoHeight;
+      // ref: https://blog.csdn.net/u010842019/article/details/52086103
+      #define ALIGN16(v) ((v+15)&~15)
+      UINT32 strideW = ALIGN16(m_VideoWidth);
+      UINT32 strideH = ALIGN16(m_VideoHeight);
+
+      const BYTE *ubase = pSampleBuffer + strideW * strideH;
       //const BYTE *pU = ubase;
       for (UINT32 y = 0; y < m_VideoHeight; y+=2) {
-        const BYTE *pY = pSampleBuffer + y * m_VideoWidth;
-        const BYTE *pY2 = pY + m_VideoWidth;
+        const BYTE *pY = pSampleBuffer + y * strideW;
+        const BYTE *pY2 = pY + strideW;
         BYTE *pDst = m_pBuffer + y * m_VideoWidth * 4;
         BYTE *pDst2 = pDst + m_VideoWidth * 4;
 
-        const BYTE *ubaseDelta = ubase + y / 2 * m_VideoWidth;
+        const BYTE *ubaseDelta = ubase + y / 2 * strideW;
         for (UINT32 x = 0; x < m_VideoWidth; x+=2) {
           BYTE Y;
           int U = (int)ubaseDelta[x] - 128;
