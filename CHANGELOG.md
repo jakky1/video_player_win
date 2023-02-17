@@ -1,7 +1,10 @@
+## 1.1.6
+
+* Support non-English filename
+
 ## 1.1.5
 
 * Fix video skew when width or height is not multiple of 16
-
 
 ## 1.1.4
 
