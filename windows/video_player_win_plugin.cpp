@@ -268,10 +268,15 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
   if (isOpenVideo) {
     auto path = std::get<std::string>(arguments[flutter::EncodableValue("path")]);
+    WCHAR wPath[1024];
+    auto convResult = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
+    if (convResult < 0) {
+      std::cout << "[video_player_win] native convert path to utf16 (WCHAR*) failed: path = " << path << std::endl;
+    }
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HRESULT hr = player->OpenURL(std::wstring(path.begin(), path.end()).c_str(), player, NULL, [=](bool isSuccess) {
+    HRESULT hr = player->OpenURL(wPath, player, NULL, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = getPlayerById(textureId, false);
         if (_player == NULL) {
