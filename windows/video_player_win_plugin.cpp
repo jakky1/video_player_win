@@ -54,7 +54,6 @@ public:
         HWND hwnd = GetAncestor(g_registrar->GetView()->GetNativeWindow(), GA_ROOT);
         mChildHWND = CreateWindowEx(WS_EX_LAYERED, L"Static", NULL, WS_CHILD | WS_DISABLED, 0, 0, 1, 1, hwnd, NULL, NULL, NULL);
         SetLayeredWindowAttributes(mChildHWND, 0, 0, LWA_ALPHA); // make child window transparent
-        std::cout << "native create window child" << std::endl;
       } else {
         mChildHWND = g_hwndStack.top();
         g_hwndStack.pop();
