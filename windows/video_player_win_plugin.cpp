@@ -19,6 +19,10 @@
 #include <stdio.h>
 
 // Jacky {
+flutter::PluginRegistrarWindows *g_registrar; // Jacky
+
+#include <stack>
+std::stack<HWND> g_hwndStack;
 
 #include <chrono>
 flutter::MethodChannel<flutter::EncodableValue>* gMethodChannel = NULL;
@@ -33,13 +37,30 @@ flutter::TextureRegistrar* texture_registar_ = NULL;
 class MyPlayerInternal : public MyPlayer, public MyPlayerCallback {
 public:
   int64_t textureId = -1;
-  FlutterDesktopPixelBuffer pixel_buffer;
+  FlutterDesktopGpuSurfaceDescriptor texture_buffer;
+  HWND mChildHWND = 0;
 
   MyPlayerInternal() {}
   ~MyPlayerInternal() {
-    if (m_pBuffer != NULL) delete m_pBuffer;
-    m_pBuffer = NULL;
     textureId = -1;
+    if (mChildHWND != 0) g_hwndStack.push(mChildHWND);
+  }
+
+  HWND getHWND() {
+    // two player cannot share the same HWND,
+    // so we create a child window when no old non-use hwnd exists
+    if (mChildHWND == 0) {
+      if (g_hwndStack.empty()) {
+        HWND hwnd = GetAncestor(g_registrar->GetView()->GetNativeWindow(), GA_ROOT);
+        mChildHWND = CreateWindowEx(WS_EX_LAYERED, L"Static", NULL, WS_CHILD | WS_DISABLED, 0, 0, 1, 1, hwnd, NULL, NULL, NULL);
+        SetLayeredWindowAttributes(mChildHWND, 0, 0, LWA_ALPHA); // make child window transparent
+        std::cout << "native create window child" << std::endl;
+      } else {
+        mChildHWND = g_hwndStack.top();
+        g_hwndStack.pop();
+      }
+    }
+    return mChildHWND;
   }
 
 	inline STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -53,11 +74,12 @@ public:
 	}
 
 private:
-  uint64_t lastFrameTime = 0;
+  wil::com_ptr<ID3D11DeviceContext> mDeviceContext;
+  wil::com_ptr<ID3D11Texture2D> mSharedTexture;
+  HANDLE mSharedTextureHandle = 0;
+
   enum PlaybackState { IDLE = 0, BUFFERING_START, BUFFERING_END, START, PAUSE, STOP, END, SESSION_ERROR };
   PlaybackState mPlaybackState = IDLE;
-  BYTE* m_pBuffer = NULL;
-  DWORD m_lastSampleSize = 0;
 
   void OnPlayerEvent(MediaEventType event) override
   {
@@ -96,79 +118,50 @@ private:
     gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
   }
 
-  void OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
-      LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
-      DWORD dwSampleSize)
+  void initTexture(ID3D11Texture2D* texture)
   {
-      if (textureId == -1) return; //player maybe shutdown or deleted
-      uint64_t now = getCurrentTime();
-      if (now - lastFrameTime < 30) return;
-      lastFrameTime = now;
+    if (mDeviceContext.get() == NULL)
+    {
+      HRESULT hr;
+      D3D11_TEXTURE2D_DESC desc;
+      wil::com_ptr<ID3D11Device> device;
 
-      if (m_lastSampleSize != dwSampleSize) {
-        m_lastSampleSize = dwSampleSize;
-        if (m_pBuffer != NULL) delete m_pBuffer;
-        m_pBuffer = new BYTE[m_VideoWidth * (m_VideoHeight + 1) * 4 + 10]; // height + 1 to avoid crash for odd width/height video
+      texture->GetDevice(&device);
+      device->GetImmediateContext(&mDeviceContext);
 
-        pixel_buffer.width = m_VideoWidth;
-        pixel_buffer.height = m_VideoHeight;
-        pixel_buffer.buffer = m_pBuffer;
-      } else if (pixel_buffer.width != m_VideoWidth) {
-        // ex. video 1280x720 -> 720x1280, sample size won't change, but we need set the correct resolution
-        pixel_buffer.width = m_VideoWidth;
-        pixel_buffer.height = m_VideoHeight;
+      texture->GetDesc(&desc);
+      desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+      desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+      hr = device->CreateTexture2D(const_cast<const D3D11_TEXTURE2D_DESC*>(&desc), NULL, &mSharedTexture);
+      if (!SUCCEEDED(hr)) {
+        std::cout << "[video_player_win] native CreateTexture2D failed: " << hr << std::endl;
+        return;
       }
 
-      // NV12 -> RGBA
-      // ref: https://blog.csdn.net/u010842019/article/details/52086103
-      #define ALIGN16(v) ((v+15)&~15)
-      UINT32 strideW = ALIGN16(m_VideoWidth);
-      UINT32 strideH = ALIGN16(m_VideoHeight);
-      if (strideW * strideH * 3 / 2 > dwSampleSize) {
-        strideH = m_VideoHeight; //workaround, why sometimes height is no need to align ?
+      wil::com_ptr<IDXGIResource1> resource;
+      mSharedTexture->QueryInterface(IID_PPV_ARGS(&resource));
+      hr = resource->GetSharedHandle(&mSharedTextureHandle);
+      if (!SUCCEEDED(hr)) {
+        std::cout << "[video_player_win] native GetSharedHandle failed: " << hr << std::endl;
+        return;
       }
 
-      const BYTE *ubase = pSampleBuffer + strideW * strideH;
-      //const BYTE *pU = ubase;
-      for (UINT32 y = 0; y < m_VideoHeight; y+=2) {
-        const BYTE *pY = pSampleBuffer + y * strideW;
-        const BYTE *pY2 = pY + strideW;
-        BYTE *pDst = m_pBuffer + y * m_VideoWidth * 4;
-        BYTE *pDst2 = pDst + m_VideoWidth * 4;
+      texture_buffer.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
+      texture_buffer.width = desc.Width;
+      texture_buffer.height = desc.Height;
+      texture_buffer.format = kFlutterDesktopPixelFormatBGRA8888;  //kFlutterDesktopPixelFormatRGBA8888; //or kFlutterDesktopPixelFormatBGRA8888
+      texture_buffer.handle = mSharedTextureHandle;
+    }
+  }
 
-        const BYTE *ubaseDelta = ubase + y / 2 * strideW;
-        for (UINT32 x = 0; x < m_VideoWidth; x+=2) {
-          BYTE Y;
-          int U = (int)ubaseDelta[x] - 128;
-          int V = (int)ubaseDelta[x+1] - 128;
+  void OnProcessFrame(ID3D11Texture2D* texture)
+  {
+    if (texture_registar_ != NULL && textureId != -1) {
+      initTexture(texture);
+      mDeviceContext->CopyResource(mSharedTexture.get(), texture);
 
-          int dy = (1435 * V) >> 10;
-          int du = (- 352 * U - 731 * V) >> 10;
-          int dv = (1814 * U) >> 10;
-
-          int tmp;
-          #define myByteClamp(dst, value)  \
-            tmp = value;                        \
-            dst = tmp < 0 ? 0 : tmp > 255 ? 255 : (BYTE)tmp;
-
-          // ref: https://zhuanlan.zhihu.com/p/397551265
-          #define _convert(pY, pDst)            \
-            Y = *(pY++);                      \
-            myByteClamp(*(pDst++), Y + dy);   \
-            myByteClamp(*(pDst++), Y + du);   \
-            myByteClamp(*(pDst++), Y + dv);   \
-            pDst++;
-
-          _convert(pY, pDst); //X0Y0
-          _convert(pY, pDst); //X1Y0
-          _convert(pY2, pDst2); //X0Y1
-          _convert(pY2, pDst2); //X1Y1
-        }
-      }
-
-      if (texture_registar_ != NULL && textureId != -1) {
-        texture_registar_->MarkTextureFrameAvailable(textureId);
-      }
+      texture_registar_->MarkTextureFrameAvailable(textureId);
+    }
   }
 };
 
@@ -177,10 +170,12 @@ std::mutex mapMutex;
 bool isMFInited = false;
 
 void createTexture(MyPlayerInternal* data) {
-  memset(&data->pixel_buffer, 0, sizeof(data->pixel_buffer));
-  flutter::TextureVariant* texture = new flutter::TextureVariant(flutter::PixelBufferTexture(
-    [=](size_t width, size_t height) -> const FlutterDesktopPixelBuffer* {
-      return &data->pixel_buffer;
+  memset(&data->texture_buffer, 0, sizeof(data->texture_buffer));
+
+  flutter::TextureVariant* texture = new flutter::TextureVariant(flutter::GpuSurfaceTexture(
+    kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle,
+    [=](size_t width, size_t height) -> const FlutterDesktopGpuSurfaceDescriptor* {
+      return &data->texture_buffer;
     }));
   data->textureId = texture_registar_->RegisterTexture(texture);
 }
@@ -211,6 +206,7 @@ void destroyPlayerById(int64_t textureId) {
   }
 
   data->Release();
+  //std::cout << "native destroy player id: " << textureId << std::endl;
 }
 
 // Jacky }
@@ -237,6 +233,8 @@ void VideoPlayerWinPlugin::RegisterWithRegistrar(
   texture_registar_ = registrar->texture_registrar(); //Jacky
   gMethodChannel = new flutter::MethodChannel<flutter::EncodableValue>(registrar->messenger(), "video_player_win",
           &flutter::StandardMethodCodec::GetInstance()); //Jacky
+
+  g_registrar = registrar; //Jacky
 }
 
 VideoPlayerWinPlugin::VideoPlayerWinPlugin() {}
@@ -276,7 +274,8 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HRESULT hr = player->OpenURL(wPath, player, NULL, [=](bool isSuccess) {
+    HWND hwnd = player->getHWND();
+    HRESULT hr = player->OpenURL(wPath, player, hwnd, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = getPlayerById(textureId, false);
         if (_player == NULL) {

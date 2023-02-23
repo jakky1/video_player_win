@@ -42,6 +42,9 @@ add_custom_command(
   COMMAND ${NUGET} install Microsoft.Windows.ImplementationLibrary -Version ${WIL_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
   DEPENDS ${NUGET}
 )
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/DX11VideoRenderer")
+AUX_SOURCE_DIRECTORY(DX11VideoRenderer DX11VideoRenderer_Sources)
 ######## Jacky }
 
 # Any new source files that you add to the plugin should be added here.
@@ -57,6 +60,7 @@ add_library(${PLUGIN_NAME} SHARED
   "video_player_win_plugin_c_api.cpp"
   ${PLUGIN_SOURCES}
   "my_grabber_player.cpp" #Jacky
+  ${DX11VideoRenderer_Sources} #Jacky
 )
 
 # Apply a standard set of build settings that are configured in the

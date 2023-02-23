@@ -87,40 +87,6 @@ private:
     InvokeFn m_pInvokeFn;
 };
 
-// --------------------------------------------------------------------------
-
-class SampleGrabberCB : public IMFSampleGrabberSinkCallback
-{
-    long m_cRef;
-    wil::com_ptr<MyPlayerCallback> m_pUserCallback;
-
-    SampleGrabberCB() : m_cRef(1) {}
-
-public:
-    static HRESULT CreateInstance(SampleGrabberCB** ppCB);
-
-    // IUnknown methods
-    STDMETHODIMP QueryInterface(REFIID iid, void** ppv);
-    STDMETHODIMP_(ULONG) AddRef();
-    STDMETHODIMP_(ULONG) Release();
-
-    void SetUserCallback(MyPlayerCallback* cb) { m_pUserCallback = cb; } //Jacky
-
-    // IMFClockStateSink methods
-    STDMETHODIMP OnClockStart(MFTIME hnsSystemTime, LONGLONG llClockStartOffset);
-    STDMETHODIMP OnClockStop(MFTIME hnsSystemTime);
-    STDMETHODIMP OnClockPause(MFTIME hnsSystemTime);
-    STDMETHODIMP OnClockRestart(MFTIME hnsSystemTime);
-    STDMETHODIMP OnClockSetRate(MFTIME hnsSystemTime, float flRate);
-
-    // IMFSampleGrabberSinkCallback methods
-    STDMETHODIMP OnSetPresentationClock(IMFPresentationClock* pClock);
-    STDMETHODIMP OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
-        LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
-        DWORD dwSampleSize);
-    STDMETHODIMP OnShutdown();
-};
-
 HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSink, IMFTopology** ppTopo);
 
 // --------------------------------------------------------------------------
@@ -137,6 +103,7 @@ MyPlayer::MyPlayer() :
 MyPlayer::~MyPlayer()
 {
     Shutdown();
+    CloseWindow(m_ChildWnd);
     std::cout << "[native] ~MyPlayer()" << std::endl;
 }
 
@@ -185,15 +152,12 @@ done:
 
 HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
 {
-    this->AddRef(); // keep *this alive before callback called
     HRESULT hr = CreateMediaSourceAsync(pszFileName, [=](IMFMediaSource* pSource) -> void {
         HRESULT hr;
-        wil::com_ptr<SampleGrabberCB> pCallback;
         wil::com_ptr<IMFTopology> pTopology;
-        wil::com_ptr<IMFMediaType> pType;
         wil::com_ptr<IMFClock> pClock;
 
-        if (this->Release() <= 0 || pSource == NULL) {
+        if (pSource == NULL) {
             //load fail or abort
             if (pSource) pSource->Release();
             loadCallback(false);
@@ -202,29 +166,16 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
         m_pMediaSource = pSource;
         pSource = NULL;
 
-        // Configure the media type that the Sample Grabber will receive.
-        // Setting the major and subtype is usually enough for the topology loader
-        // to resolve the topology.
-
-        CHECK_HR(hr = MFCreateMediaType(&pType));
-        CHECK_HR(hr = pType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video));
-        CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12)); //OK
-        //CHECK_HR(hr = pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32)); //fail
-
-        if (playerCallback != NULL) //Jacky
         {
-            // Create the sample grabber sink.
-            CHECK_HR(hr = SampleGrabberCB::CreateInstance(&pCallback));
-            pCallback->SetUserCallback(playerCallback);
-            CHECK_HR(hr = MFCreateSampleGrabberSinkActivate(pType.get(), pCallback.get(), &m_pVideoSinkActivate)); //Jacky
+            //CHECK_HR(hr = MFCreateVideoRendererActivate(hwndVideo, &m_pVideoSinkActivate)); //Jacky
+            D3D11Texture2DCallback frameCB = NULL;
+            if (playerCallback != NULL) {
+                frameCB = [playerCallback](ID3D11Texture2D* texture) -> void {
+                    playerCallback->OnProcessFrame(texture);
+                };
+            }
+            CHECK_HR(hr = CreateDX11VideoRendererActivate(hwndVideo, &m_pVideoSinkActivate, frameCB)); //Jacky
         }
-        else
-        {
-            CHECK_HR(hr = MFCreateVideoRendererActivate(hwndVideo, &m_pVideoSinkActivate)); //Jacky
-        }
-
-        // To run as fast as possible, set this attribute (requires Windows 7):
-        CHECK_HR(hr = m_pVideoSinkActivate->SetUINT32(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, FALSE)); //Jacky
 
         // Create the Media Session.
         CHECK_HR(hr = MFCreateMediaSession(NULL, &m_pSession));
@@ -313,7 +264,7 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
 
 SIZE MyPlayer::GetVideoSize()
 {
-    SIZE size;
+    SIZE size = {};
     size.cx = m_VideoWidth;
     size.cy = m_VideoHeight;
     return size;
@@ -420,7 +371,6 @@ HRESULT MyPlayer::CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMe
     CAsyncCallback* cb = NULL;
     CHECK_HR(hr = MFCreateSourceResolver(&m_pSourceResolver));
 
-    this->AddRef(); // prevent *this released before callback
     hr = m_pSourceResolver->BeginCreateObjectFromURL(pszURL,
         MF_RESOLUTION_MEDIASOURCE, NULL, &m_pSourceResolverCancelCookie,
         cb = new CAsyncCallback([=](IMFAsyncResult* pResult) -> HRESULT {
@@ -429,7 +379,7 @@ HRESULT MyPlayer::CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMe
             wil::com_ptr<IUnknown> pSource;
             wil::com_ptr<IMFMediaSource> pMediaSource;
 
-            if (this->Release() <= 0 || m_isShutdown) {
+            if (m_isShutdown) {
                 //pResult->Release();
                 callback(NULL);
                 return E_FAIL; // *this* maybe already deleted, so don't access any *this members, and return immediately!
@@ -602,99 +552,4 @@ HRESULT MyPlayer::CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActi
 
 done:
     return hr;
-}
-
-// SampleGrabberCB implementation
-
-// Create a new instance of the object.
-HRESULT SampleGrabberCB::CreateInstance(SampleGrabberCB** ppCB)
-{
-    *ppCB = new (std::nothrow) SampleGrabberCB();
-
-    if (ppCB == NULL)
-    {
-        return E_OUTOFMEMORY;
-    }
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::QueryInterface(REFIID riid, void** ppv)
-{
-    static const QITAB qit[] =
-    {
-        QITABENT(SampleGrabberCB, IMFSampleGrabberSinkCallback),
-        QITABENT(SampleGrabberCB, IMFClockStateSink),
-        { 0 }
-    };
-    return QISearch(this, qit, riid, ppv);
-}
-
-STDMETHODIMP_(ULONG) SampleGrabberCB::AddRef()
-{
-    return InterlockedIncrement(&m_cRef);
-}
-
-STDMETHODIMP_(ULONG) SampleGrabberCB::Release()
-{
-    ULONG cRef = InterlockedDecrement(&m_cRef);
-    if (cRef == 0)
-    {
-        delete this;
-    }
-    return cRef;
-
-}
-
-// IMFClockStateSink methods.
-
-// In these example, the IMFClockStateSink methods do not perform any actions.
-// You can use these methods to track the state of the sample grabber sink.
-
-STDMETHODIMP SampleGrabberCB::OnClockStart(MFTIME hnsSystemTime, LONGLONG llClockStartOffset)
-{
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::OnClockStop(MFTIME hnsSystemTime)
-{
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::OnClockPause(MFTIME hnsSystemTime)
-{
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::OnClockRestart(MFTIME hnsSystemTime)
-{
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::OnClockSetRate(MFTIME hnsSystemTime, float flRate)
-{
-    return S_OK;
-}
-
-// IMFSampleGrabberSink methods.
-
-STDMETHODIMP SampleGrabberCB::OnSetPresentationClock(IMFPresentationClock* pClock)
-{
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
-    LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
-    DWORD dwSampleSize)
-{
-    if (m_pUserCallback.get() == NULL) return S_OK;
-    m_pUserCallback->OnProcessSample(guidMajorMediaType, dwSampleFlags,
-        llSampleTime, llSampleDuration, pSampleBuffer,
-        dwSampleSize);
-    return S_OK;
-}
-
-STDMETHODIMP SampleGrabberCB::OnShutdown()
-{
-    m_pUserCallback.reset();
-    return S_OK;
 }

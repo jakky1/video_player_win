@@ -120,7 +120,7 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
     await methodChannel
         .invokeMethod<bool>('shutdown', {"textureId": textureId});
     // NOTE: delay some time to wait last callbacks finished
-    await Future.delayed(const Duration(milliseconds: 3000));
+    await Future.delayed(const Duration(milliseconds: 100));
     await methodChannel.invokeMethod<bool>('dispose', {"textureId": textureId});
   }
 }
