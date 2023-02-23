@@ -4,39 +4,31 @@
 
 [visits-count-image]: https://img.shields.io/badge/dynamic/json?label=Visits%20Count&query=value&url=https://api.countapi.xyz/hit/jakky1_video_player_win/visits
 
-Flutter Video player for Windows, lightweight, using Windows built-in Media Foundation API.
+Flutter video player for Windows, lightweight, using Windows built-in Media Foundation API.
 Windows implementation of the [video_player][1] plugin.
 
 ## Platform Support
 
 This package itself support only Windows.
 
-But use it with [video_player][1], you can write once then support Windows / Android / iOS / Web at the same time.
-
-Android / iOS / Web is supported by [video_player][1]
+But use it with [video_player][1], your app can support Windows / Android / iOS / Web at the same time.
 
 ## Built-in control panel & Fullscreen & Subtitle support
 
-If your application will run on Windows / Android / iOS / Web,
-or if you want a built-in video control panel,
-or if you need to show subtitles,
-please use package [video_player_control_panel][2] instead.
-Which also use this package to play media on Windows.
+Please use package [video_player_control_panel][2] instead.
 
-## Play 4K 60fps video in Windows
-
-This package use texture to display video, so play 4K or 60fps video should be slow.
-
-You can try [webview_win_floating][5] to play 4K video by webview on Windows. It use native WebView2 component. If your PC can play 4K video on Microsoft Edge, it may be playable on [webview_win_floating][5] too.
+Which also use this package to play video on Windows.
 
 ## Features & Limitations
 
-This package use native Media Foundation API pre-built in Windows OS. So:
+Features:
 
-- No GPL / LGPL 3rd-party library inside.
-- only one dll file (about 128 KB) added as a plugin.
+- GPU hardware acceleration, low CPU usage *(maybe support 4K 60fps video?)*
+- No GPL / LGPL 3rd-party libraries inside.
+- Only one dll file (~180 KB) added as a plugin.
+- Support Windows / Android / iOS / Web by collaboration with [video_player][1]
 
-But, as a trade-off, there are some limtations:
+But, since this package use Microsoft Media Foundation API, there are some limtations:
 
 - Playback will use codecs preloaded in Windows OS. If you want to play some video format that not supported by these preloaded codecs, you need to install 3rd-party codecs exe file, about 18 MB. (see the next section).
 
@@ -50,7 +42,7 @@ However, the preloaded codecs in Windows is limited.
 If you have a media file cannot played by this package, ALSO CANNOT played by WMP  (Windows Media Player), it means that this media file is not support by codecs preloaded in your Windows.
 
 In this case, please install ONE of the following codec pack into your Windows:
-- [K-Lite codec pack][3]
+- [K-Lite codec pack][3] (~18MB)
 - [Windows 10 Codec Pack][4]
 
 You can auto-install codec by the following Dart code:

@@ -1,3 +1,7 @@
+## 2.0.0
+
+* Enable GPU hardware acceleration
+
 ## 1.1.6
 
 * Support non-English filename
