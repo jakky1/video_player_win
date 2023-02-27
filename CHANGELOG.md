@@ -1,3 +1,8 @@
+## 2.2.0
+
+* Enhance performance
+* Fix memory leak
+
 ## 2.0.0
 
 * Enable GPU hardware acceleration
