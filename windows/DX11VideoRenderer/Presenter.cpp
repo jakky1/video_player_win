@@ -9,6 +9,191 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
+// Jacky {
+class MySwapChain1 : public IDXGISwapChain1 //create only 1 sharable texture to avoid copying resource
+{
+private:
+    int m_RefCount = 1;
+    ID3D11Device* m_Device = NULL;
+    ID3D11Texture2D* m_SharedTexture = NULL;
+    D3D11_TEXTURE2D_DESC desc;
+
+    void destroyTexture() {
+        if (m_SharedTexture != NULL) {
+            //m_SharedTexture->Release();
+            while (m_SharedTexture->Release() > 0); // workaround to avoid memory leak
+            m_SharedTexture = NULL;
+        }
+    }
+
+    void createTexture(int width, int height) {
+        destroyTexture();
+        HRESULT hr;
+        desc.ArraySize = 1;
+        desc.CPUAccessFlags = 0;
+        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.MiscFlags = 0;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+        hr = m_Device->CreateTexture2D(const_cast<const D3D11_TEXTURE2D_DESC*>(&desc), NULL, &m_SharedTexture);
+    }
+
+public:
+    MySwapChain1(ID3D11Device *device, DXGI_SWAP_CHAIN_DESC1 *scd) {
+        m_Device = device;
+        m_Device->AddRef();
+        createTexture(scd->Width, scd->Height);
+    }
+
+    ~MySwapChain1() {
+        destroyTexture();
+        m_Device->Release();
+        m_Device = NULL;
+    }
+
+    HRESULT Present(UINT SyncInterval, UINT Flags) {
+        return S_OK;
+    }
+
+    HRESULT Present1(UINT SyncInterval, UINT PresentFlags, const DXGI_PRESENT_PARAMETERS* pPresentParameters) {
+        return S_OK;
+    }
+
+    HRESULT ResizeBuffers(UINT BufferCount, UINT Width, UINT Height,
+        DXGI_FORMAT NewFormat, UINT SwapChainFlags) {
+        createTexture(Width, Height);
+        return S_OK;
+    }
+
+    HRESULT GetBuffer(UINT Buffer, REFIID riid, void** ppSurface) {
+        if (riid == __uuidof(ID3D11Texture2D)) {
+            *ppSurface = m_SharedTexture;
+            m_SharedTexture->AddRef();
+            return S_OK;
+        }
+        return E_FAIL;
+    }
+
+    HRESULT SetFullscreenState(BOOL Fullscreen, IDXGIOutput* pTarget) {
+        return S_OK;
+    }
+
+    HRESULT GetFullscreenState(BOOL* pFullscreen, IDXGIOutput** ppTarget) {
+        return S_OK;
+    }
+
+    HRESULT GetDesc(DXGI_SWAP_CHAIN_DESC* pDesc) {
+        return S_OK;
+    }
+
+    HRESULT ResizeTarget(const DXGI_MODE_DESC* pNewTargetParameters) {
+        return S_OK;
+    }
+
+    HRESULT GetContainingOutput(IDXGIOutput** ppOutput) {
+        return S_OK;
+    }
+
+    HRESULT GetFrameStatistics(DXGI_FRAME_STATISTICS* pStats) {
+        return S_OK;
+    }
+
+    HRESULT GetLastPresentCount(UINT* pLastPresentCount) {
+        return S_OK;
+    }
+
+    HRESULT GetDevice(REFIID riid, void** ppDevice) {
+        return S_OK;
+    }
+
+    HRESULT SetPrivateData(REFGUID Name, UINT DataSize, const void* pData) {
+        return S_OK;
+    }
+
+    HRESULT SetPrivateDataInterface(REFGUID Name, const IUnknown* pUnknown) {
+        return S_OK;
+    }
+
+    HRESULT GetPrivateData(REFGUID Name, UINT* pDataSize, void* pData) {
+        return S_OK;
+    }
+
+    HRESULT GetParent(REFIID riid, void** ppParent) {
+        return S_OK;
+    }
+
+
+    HRESULT GetDesc1(DXGI_SWAP_CHAIN_DESC1* pDesc) {
+        return S_OK;
+    }
+
+    HRESULT GetFullscreenDesc(DXGI_SWAP_CHAIN_FULLSCREEN_DESC* pDesc) {
+        return S_OK;
+    }
+
+    HRESULT GetHwnd(HWND* pHwnd) {
+        return S_OK;
+    }
+
+    HRESULT GetCoreWindow(REFIID refiid, void** ppUnk) {
+        return S_OK;
+    }
+
+    BOOL IsTemporaryMonoSupported(void) {
+        return FALSE;
+    }
+
+    HRESULT GetRestrictToOutput(IDXGIOutput** ppRestrictToOutput) {
+        return S_OK;
+    }
+
+    HRESULT SetBackgroundColor(const DXGI_RGBA* pColor) {
+        return S_OK;
+    }
+
+    HRESULT GetBackgroundColor(DXGI_RGBA* pColor) {
+        return S_OK;
+    }
+
+    HRESULT SetRotation(DXGI_MODE_ROTATION Rotation) {
+        return S_OK;
+    }
+
+    HRESULT GetRotation(DXGI_MODE_ROTATION* pRotation) {
+        return S_OK;
+    }
+
+
+    HRESULT QueryInterface(REFIID riid, void** ppvObject) {
+        if (riid == __uuidof(IDXGISwapChain)
+            || riid == __uuidof(IDXGISwapChain1)) {
+            *ppvObject = this;
+            AddRef();
+            return S_OK;
+        }
+        return E_FAIL;
+    }
+
+    ULONG AddRef() {
+        return ++m_RefCount;
+    }
+
+    ULONG Release() {
+        m_RefCount --;
+        if (m_RefCount <= 0) {
+            delete this;
+        }
+        return m_RefCount;
+    }
+};
+// Jacky }
+
 //-------------------------------------------------------------------
 // CPresenter constructor.
 //-------------------------------------------------------------------
@@ -2236,7 +2421,15 @@ HRESULT DX11VideoRenderer::CPresenter::UpdateDXGISwapChain(void)
 
         if (!m_useDCompVisual)
         {
-            hr = m_pDXGIFactory2->CreateSwapChainForHwnd(m_pD3D11Device, m_hwndVideo, &scd, NULL, NULL, &m_pSwapChain1);
+            if (m_textureCallback != NULL) //Jacky
+            {
+                m_pSwapChain1 = new MySwapChain1(m_pD3D11Device, &scd); //Jacky
+            }
+            else
+            {
+                hr = m_pDXGIFactory2->CreateSwapChainForHwnd(m_pD3D11Device, m_hwndVideo, &scd, NULL, NULL, &m_pSwapChain1);
+            }
+            //hr = m_pDXGIFactory2->CreateSwapChainForHwnd(m_pD3D11Device, m_hwndVideo, &scd, NULL, NULL, &m_pSwapChain1); //Jacky
             if (FAILED(hr))
             {
                 break;

@@ -73,8 +73,7 @@ public:
 	}
 
 private:
-  wil::com_ptr<ID3D11DeviceContext> mDeviceContext;
-  wil::com_ptr<ID3D11Texture2D> mSharedTexture;
+  bool mTextureInited = false;
   HANDLE mSharedTextureHandle = 0;
 
   enum PlaybackState { IDLE = 0, BUFFERING_START, BUFFERING_END, START, PAUSE, STOP, END, SESSION_ERROR };
@@ -119,26 +118,14 @@ private:
 
   void initTexture(ID3D11Texture2D* texture)
   {
-    if (mDeviceContext.get() == NULL)
+    if (!mTextureInited)
     {
       HRESULT hr;
       D3D11_TEXTURE2D_DESC desc;
-      wil::com_ptr<ID3D11Device> device;
-
-      texture->GetDevice(&device);
-      device->GetImmediateContext(&mDeviceContext);
-
       texture->GetDesc(&desc);
-      desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-      desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-      hr = device->CreateTexture2D(const_cast<const D3D11_TEXTURE2D_DESC*>(&desc), NULL, &mSharedTexture);
-      if (!SUCCEEDED(hr)) {
-        std::cout << "[video_player_win] native CreateTexture2D failed: " << hr << std::endl;
-        return;
-      }
 
       wil::com_ptr<IDXGIResource1> resource;
-      mSharedTexture->QueryInterface(IID_PPV_ARGS(&resource));
+      texture->QueryInterface(IID_PPV_ARGS(&resource));
       hr = resource->GetSharedHandle(&mSharedTextureHandle);
       if (!SUCCEEDED(hr)) {
         std::cout << "[video_player_win] native GetSharedHandle failed: " << hr << std::endl;
@@ -150,6 +137,8 @@ private:
       texture_buffer.height = desc.Height;
       texture_buffer.format = kFlutterDesktopPixelFormatBGRA8888;  //kFlutterDesktopPixelFormatRGBA8888; //or kFlutterDesktopPixelFormatBGRA8888
       texture_buffer.handle = mSharedTextureHandle;
+
+      mTextureInited = true;
     }
   }
 
@@ -157,8 +146,6 @@ private:
   {
     if (texture_registar_ != NULL && textureId != -1) {
       initTexture(texture);
-      mDeviceContext->CopyResource(mSharedTexture.get(), texture);
-
       texture_registar_->MarkTextureFrameAvailable(textureId);
     }
   }

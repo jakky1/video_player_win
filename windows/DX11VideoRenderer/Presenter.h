@@ -392,7 +392,7 @@ namespace DX11VideoRenderer
             }
             return ulVal;
         }
-    
+
         STDMETHODIMP CreateBuffer(
             _In_  const D3D11_BUFFER_DESC* pDesc,
             _In_opt_  const D3D11_SUBRESOURCE_DATA* pInitialData,
@@ -400,7 +400,7 @@ namespace DX11VideoRenderer
         {
             return m_pReal->CreateBuffer(pDesc,pInitialData,ppBuffer);
         }
-    
+
         STDMETHODIMP CreateTexture1D(
             _In_  const D3D11_TEXTURE1D_DESC* pDesc,
             _In_reads_opt_(pDesc->MipLevels * pDesc->ArraySize)  const D3D11_SUBRESOURCE_DATA* pInitialData,
