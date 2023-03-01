@@ -2,6 +2,7 @@
 
 * Enhance performance
 * Fix memory leak
+* Fix SetVolume() issue
 
 ## 2.0.0
 

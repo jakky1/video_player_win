@@ -55,7 +55,6 @@ public:
 
 	HRESULT GetVolume(float* pVol);
 	HRESULT SetVolume(float vol);
-	HRESULT SetMute(bool bMute);
 
 	MyPlayer();
 	virtual ~MyPlayer();
@@ -81,7 +80,7 @@ private:
 	wil::com_ptr<IMFActivate> m_pVideoTransformActivate;
 	wil::com_ptr<IMFActivate> m_pVideoSinkActivate;
 	wil::com_ptr<IMFActivate> m_pAudioRendererActivate;
-	wil::com_ptr<ISimpleAudioVolume> m_pSimpleAudioVolume;
+	wil::com_ptr<IMFAudioStreamVolume> m_pAudioVolume;
 	wil::com_ptr<IMFPresentationClock> m_pClock;
 	wil::com_ptr<IMFRateControl> m_pRate;
 	wil::com_ptr<IMFSourceResolver> m_pSourceResolver;
@@ -89,4 +88,6 @@ private:
 	MFTIME m_hnsDuration;
 	bool m_isShutdown;
 	HWND m_ChildWnd;
+
+	float m_vol;
 };

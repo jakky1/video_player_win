@@ -95,9 +95,10 @@ MyPlayer::MyPlayer() :
     m_hnsDuration(-1),
     m_VideoWidth(0),
     m_VideoHeight(0),
+    m_vol(1.0),
     m_isShutdown(false)
 {
-    initAudioVolume();
+    // do nothing
 }
 
 MyPlayer::~MyPlayer()
@@ -105,49 +106,6 @@ MyPlayer::~MyPlayer()
     Shutdown();
     CloseWindow(m_ChildWnd);
     std::cout << "[native] ~MyPlayer()" << std::endl;
-}
-
-HRESULT MyPlayer::initAudioVolume()
-{
-    HRESULT hr = S_OK;
-
-    wil::com_ptr<IMMDeviceEnumerator> pDeviceEnumerator;
-    wil::com_ptr<IMMDevice> pDevice;
-    wil::com_ptr<IAudioSessionManager> pAudioSessionManager;
-
-    // Get the enumerator for the audio endpoint devices.
-    hr = CoCreateInstance(
-        __uuidof(MMDeviceEnumerator),
-        NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_PPV_ARGS(&pDeviceEnumerator)
-    );
-
-    if (FAILED(hr)) { goto done; }
-
-    // Get the default audio endpoint that the SAR will use.
-    hr = pDeviceEnumerator->GetDefaultAudioEndpoint(
-        eRender,
-        eConsole,   // The SAR uses 'eConsole' by default.
-        &pDevice
-    );
-    if (FAILED(hr)) { goto done; }
-
-    // Get the session manager for this device.
-    hr = pDevice->Activate(
-        __uuidof(IAudioSessionManager),
-        CLSCTX_INPROC_SERVER,
-        NULL,
-        (void**)&pAudioSessionManager
-    );
-    if (FAILED(hr)) { goto done; }
-
-    hr = pAudioSessionManager->GetSimpleAudioVolume(
-        &GUID_NULL, 0, &m_pSimpleAudioVolume
-    );
-
-done:
-    return hr;
 }
 
 HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
@@ -276,24 +234,40 @@ HRESULT MyPlayer::SetPlaybackSpeed(float speed)
     return m_pRate->SetRate(FALSE, speed);
 }
 
+HRESULT MyPlayer::initAudioVolume()
+{
+    if (m_pAudioVolume) return S_OK;
+    if (!m_pAudioRendererActivate) return E_FAIL;
+
+    HRESULT hr;
+    wil::com_ptr<IMFGetService> pGetService;
+    CHECK_HR(hr = m_pAudioRendererActivate->ActivateObject(IID_PPV_ARGS(&pGetService)));
+    CHECK_HR(hr = pGetService->GetService(MR_STREAM_VOLUME_SERVICE, IID_PPV_ARGS(&m_pAudioVolume)));
+done:
+    return hr;
+}
+
 HRESULT MyPlayer::GetVolume(float* pVol)
 {
-    if (m_pSession == NULL) return E_FAIL;
-    return m_pSimpleAudioVolume->GetMasterVolume(pVol);
+    *pVol = m_vol;
+    return S_OK;
 }
 
 HRESULT MyPlayer::SetVolume(float vol)
 {
-    if (m_pSession == NULL) return E_FAIL;
-    return m_pSimpleAudioVolume->SetMasterVolume(vol, NULL);
-}
+    HRESULT hr;
+    UINT32 channelsCount;
+    float volumes[30];
 
-HRESULT MyPlayer::SetMute(bool bMute)
-{
-    if (m_pSession == NULL) return E_FAIL;
-    return m_pSimpleAudioVolume->SetMute(bMute, NULL);
-}
+    CHECK_HR(hr = initAudioVolume());
+    CHECK_HR(hr = m_pAudioVolume->GetChannelCount(&channelsCount));
+    for (UINT32 i = 0; i < channelsCount; i++) volumes[i] = vol;
+    CHECK_HR(hr = m_pAudioVolume->SetAllVolumes(channelsCount, volumes));
+    m_vol = vol;
 
+done:
+    return hr;
+}
 
 void MyPlayer::Shutdown()
 {
@@ -308,12 +282,11 @@ void MyPlayer::Shutdown()
     //       then client call player->Release() will make refCount = 0
     if (m_pSession) {
         m_pSession->Stop();
-        m_pSession->Close();
-
-        m_pSession->Shutdown();
-        m_pMediaSource->Shutdown();
         if (m_pVideoSinkActivate.get() != NULL) m_pVideoSinkActivate->ShutdownObject();
         if (m_pAudioRendererActivate.get() != NULL) m_pAudioRendererActivate->ShutdownObject();
+        m_pSession->Shutdown();
+        m_pMediaSource->Shutdown();
+        m_pSession->Close();
     }
 }
 
