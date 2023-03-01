@@ -154,17 +154,6 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
         // add event listener
         m_pSession->BeginGetEvent(this, NULL);
 
-        /* Jacky test, try to get volume control fail... {
-        {
-            UINT32 channelsCount;
-            float volumes[100];
-            IMFAudioStreamVolume* pAudioVolume = NULL;
-            CHECK_HR(hr = MFGetService(m_pSession, MR_STREAM_VOLUME_SERVICE, IID_PPV_ARGS(&pAudioVolume))); // will fail here... no such interface error...
-            CHECK_HR(hr = pAudioVolume->GetChannelCount(&channelsCount));
-            for (int i = 0; i < channelsCount; i++) volumes[i] = 10;
-            CHECK_HR(hr = pAudioVolume->SetAllVolumes(channelsCount, volumes));
-        }
-        */
         if (m_isShutdown) hr = E_FAIL;
 
     done:
@@ -499,18 +488,6 @@ HRESULT MyPlayer::CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActi
             CHECK_HR(hr = MFCreateAudioRendererActivate(&m_pAudioRendererActivate));
             CHECK_HR(hr = AddOutputNode(pTopology.get(), m_pAudioRendererActivate.get(), 0, &pNodeAudioSink));
             CHECK_HR(hr = pNodeSrc->ConnectOutput(0, pNodeAudioSink.get(), 0));
-
-            /* Jacky test, try to get volume control fail... {
-            {
-                UINT32 channelsCount;
-                float volumes[100];
-                IMFAudioStreamVolume* pAudioVolume = NULL;
-                CHECK_HR(hr = MFGetService(pRendererActivate, MR_STREAM_VOLUME_SERVICE, IID_PPV_ARGS(&pAudioVolume))); // will fail here... no such interface error...
-                CHECK_HR(hr = pAudioVolume->GetChannelCount(&channelsCount));
-                for (int i = 0; i < channelsCount; i++) volumes[i] = 10;
-                CHECK_HR(hr = pAudioVolume->SetAllVolumes(channelsCount, volumes));
-            }
-            */
         }
         else
         {

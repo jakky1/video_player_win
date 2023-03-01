@@ -46,22 +46,6 @@ public:
     if (mChildHWND != 0) g_hwndStack.push(mChildHWND);
   }
 
-  HWND getHWND() {
-    // two player cannot share the same HWND,
-    // so we create a child window when no old non-use hwnd exists
-    if (mChildHWND == 0) {
-      if (g_hwndStack.empty()) {
-        HWND hwnd = GetAncestor(g_registrar->GetView()->GetNativeWindow(), GA_ROOT);
-        mChildHWND = CreateWindowEx(WS_EX_LAYERED, L"Static", NULL, WS_CHILD | WS_DISABLED, 0, 0, 1, 1, hwnd, NULL, NULL, NULL);
-        SetLayeredWindowAttributes(mChildHWND, 0, 0, LWA_ALPHA); // make child window transparent
-      } else {
-        mChildHWND = g_hwndStack.top();
-        g_hwndStack.pop();
-      }
-    }
-    return mChildHWND;
-  }
-
 	inline STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
     return MyPlayer::QueryInterface(riid, ppv);
 	}
@@ -260,7 +244,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HWND hwnd = player->getHWND();
+    HWND hwnd = GetAncestor(g_registrar->GetView()->GetNativeWindow(), GA_ROOT);
     HRESULT hr = player->OpenURL(wPath, player, hwnd, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = getPlayerById(textureId, false);
