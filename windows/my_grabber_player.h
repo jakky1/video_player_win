@@ -90,4 +90,12 @@ private:
 	HWND m_ChildWnd;
 
 	float m_vol;
+
+	// save parameters in OpenURL(), used to re-open when open failed
+	bool m_topoSet = false;
+	std::wstring m_url;
+	HWND m_wnd;
+	MyPlayerCallback *m_playerCallback;
+	std::function<void(bool)> m_loadCallback;
+	//
 };

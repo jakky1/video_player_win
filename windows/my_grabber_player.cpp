@@ -110,6 +110,13 @@ MyPlayer::~MyPlayer()
 
 HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
 {
+    // save parameters in OpenURL(), used to re-open when open failed
+    m_url = pszFileName;
+    m_wnd = hwndVideo;
+    m_playerCallback = playerCallback;
+    m_loadCallback = loadCallback;
+    //
+
     HRESULT hr = CreateMediaSourceAsync(pszFileName, [=](IMFMediaSource* pSource) -> void {
         HRESULT hr;
         wil::com_ptr<IMFTopology> pTopology;
@@ -159,7 +166,7 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
     done:
         // Clean up.
         if (FAILED(hr)) Shutdown();
-        loadCallback(SUCCEEDED(hr));
+        //loadCallback(SUCCEEDED(hr));
         });
 
     // Clean up.
@@ -306,6 +313,18 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
     CHECK_HR(hr = m_pSession->BeginGetEvent(this, NULL));
 
     //std::cout << "native player event: " << meType << std::endl;
+
+    if (meType == MESessionNotifyPresentationTime) {
+        m_topoSet = true;
+        m_loadCallback(true);
+    } else if (meType == MESessionPaused && !m_topoSet) {
+        // workaround: something wrong with topology, re-open now
+        Shutdown();
+        m_isShutdown = false;
+        OpenURL(m_url.c_str(), m_playerCallback, m_wnd, m_loadCallback);
+        return S_OK;
+    }
+
     switch (meType) {
     case MESessionStarted:
     case MEBufferingStarted:
