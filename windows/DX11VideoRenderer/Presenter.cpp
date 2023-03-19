@@ -633,6 +633,7 @@ HRESULT DX11VideoRenderer::CPresenter::PresentFrame(void)
     }
     while (FALSE);
 
+    m_bCanProcessNextSample = TRUE; //Jacky
     return hr;
 }
 
