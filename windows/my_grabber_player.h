@@ -92,10 +92,8 @@ private:
 	float m_vol;
 
 	// save parameters in OpenURL(), used to re-open when open failed
-	bool m_topoSet = false;
-	std::wstring m_url;
-	HWND m_wnd;
-	MyPlayerCallback *m_playerCallback;
+	bool m_topoSet = false; // is topology set succesfully
+	std::function<void(void)> m_reopenFunc;
 	std::function<void(bool)> m_loadCallback;
 	//
 };
