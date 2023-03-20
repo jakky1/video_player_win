@@ -22,7 +22,7 @@
 flutter::PluginRegistrarWindows *g_registrar; // Jacky
 
 #include <stack>
-std::stack<HWND> g_hwndStack;
+#include <set>
 
 #include <chrono>
 flutter::MethodChannel<flutter::EncodableValue>* gMethodChannel = NULL;
@@ -31,6 +31,68 @@ inline uint64_t getCurrentTime() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
+
+#include <set>
+class ScreenOnKeeper {
+public:
+  ScreenOnKeeper() {
+    m_id = ++g_lastId;
+
+    if (g_handle == 0) {
+      REASON_CONTEXT ctx;
+      ctx.Version = POWER_REQUEST_CONTEXT_VERSION;
+      ctx.Flags = POWER_REQUEST_CONTEXT_SIMPLE_STRING;
+      ctx.Reason.SimpleReasonString = L"[video_player_win]";
+      g_handle = PowerCreateRequest(&ctx);
+    }
+  }
+
+  ~ScreenOnKeeper() {
+    enable(false);
+  }
+
+  void enable(bool b) {
+    if (m_isEnabled == b)
+      return;
+    m_isEnabled = b;
+    const std::lock_guard<std::mutex> lock(g_keeperMutex);
+
+    bool exists = g_keeperIdSet.find(m_id) != g_keeperIdSet.end();
+
+    if (b) {
+      if (!exists) {
+        if (g_keeperIdSet.empty()) {
+          PowerSetRequest(g_handle, PowerRequestSystemRequired);
+          PowerSetRequest(g_handle, PowerRequestDisplayRequired);
+          //std::cout << "[video_player_win] enable keep screen on" << std::endl;
+        }
+        g_keeperIdSet.insert(m_id);
+      }
+    } else {
+      if (exists) {
+        g_keeperIdSet.erase(m_id);
+        if (g_keeperIdSet.empty()) {
+          PowerClearRequest(g_handle, PowerRequestSystemRequired);
+          PowerClearRequest(g_handle, PowerRequestDisplayRequired);
+          //std::cout << "[video_player_win] disable keep screen on" << std::endl;
+        }
+      }
+    }
+  }
+private:
+  bool m_isEnabled = false;
+  int m_id;
+
+  static int g_lastId;
+  static std::set<int> g_keeperIdSet;
+  static std::mutex g_keeperMutex;
+  static HANDLE g_handle;
+};
+int ScreenOnKeeper::g_lastId = 0;
+std::set<int> ScreenOnKeeper::g_keeperIdSet;
+std::mutex ScreenOnKeeper::g_keeperMutex;
+HANDLE ScreenOnKeeper::g_handle = 0;
+
 
 flutter::TextureRegistrar* texture_registar_ = NULL;
 
@@ -42,8 +104,8 @@ public:
 
   MyPlayerInternal() {}
   ~MyPlayerInternal() {
+    keepScreenOn(false);
     textureId = -1;
-    if (mChildHWND != 0) g_hwndStack.push(mChildHWND);
   }
 
 	inline STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
@@ -59,9 +121,16 @@ public:
 private:
   bool mTextureInited = false;
   HANDLE mSharedTextureHandle = 0;
+  ScreenOnKeeper m_screenOnKeeper;
 
   enum PlaybackState { IDLE = 0, BUFFERING_START, BUFFERING_END, START, PAUSE, STOP, END, SESSION_ERROR };
   PlaybackState mPlaybackState = IDLE;
+
+  void keepScreenOn(bool keepOn) {
+    if (m_VideoWidth <= 0) // if audio-only media
+      return;
+    m_screenOnKeeper.enable(keepOn);
+  }
 
   void OnPlayerEvent(MediaEventType event) override
   {
@@ -74,18 +143,23 @@ private:
         break;
       case MESessionStarted:
         mPlaybackState = START;
+        keepScreenOn(true);
         break;
       case MESessionPaused:
         mPlaybackState = PAUSE;
+        keepScreenOn(false);
         break;
       case MESessionStopped:
         mPlaybackState = STOP;
+        keepScreenOn(false);
         break;
       case MESessionClosed:
         mPlaybackState = IDLE;
+        keepScreenOn(false);
         break;
       case MESessionEnded:
         mPlaybackState = END;
+        keepScreenOn(false);
         break;
       case MEError:
         mPlaybackState = SESSION_ERROR;
