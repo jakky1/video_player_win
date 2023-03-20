@@ -96,6 +96,7 @@ MyPlayer::MyPlayer() :
     m_VideoWidth(0),
     m_VideoHeight(0),
     m_vol(1.0),
+    m_isUserAskPlaying(false),
     m_isShutdown(false)
 {
     // do nothing
@@ -180,6 +181,9 @@ HRESULT MyPlayer::Play(LONGLONG ms)
     if (m_pSession == NULL) return E_FAIL;
     if (ms >= 0) return Seek(ms);
 
+    m_isUserAskPlaying = true;
+    doSetVolume(m_vol);
+
     PROPVARIANT var;
     PropVariantInit(&var);
     return m_pSession->Start(NULL, &var);
@@ -188,6 +192,7 @@ HRESULT MyPlayer::Play(LONGLONG ms)
 HRESULT MyPlayer::Pause()
 {
     if (m_pSession == NULL) return E_FAIL;
+    m_isUserAskPlaying = false;
     return m_pSession->Pause();
 }
 
@@ -211,10 +216,17 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
 {
     PROPVARIANT var;
     if (m_pSession == NULL) return E_FAIL;
+
     PropVariantInit(&var);
     var.vt = VT_I8;
     var.hVal.QuadPart = ms * 10000;
-    return m_pSession->Start(NULL, &var);
+
+    // if seek in pause state, mute the volume
+    if (!m_isUserAskPlaying) doSetVolume(0.0f);
+    HRESULT hr = m_pSession->Start(NULL, &var);
+    if (!m_isUserAskPlaying) m_pSession->Pause();
+
+    return hr;
 }
 
 SIZE MyPlayer::GetVideoSize()
@@ -252,15 +264,23 @@ HRESULT MyPlayer::GetVolume(float* pVol)
 
 HRESULT MyPlayer::SetVolume(float vol)
 {
+    HRESULT hr = doSetVolume(vol);
+    if (SUCCEEDED(hr)) {
+        m_vol = vol;
+    }
+    return hr;
+}
+
+HRESULT MyPlayer::doSetVolume(float fVol)
+{
     HRESULT hr;
     UINT32 channelsCount;
     float volumes[30];
 
     CHECK_HR(hr = initAudioVolume());
     CHECK_HR(hr = m_pAudioVolume->GetChannelCount(&channelsCount));
-    for (UINT32 i = 0; i < channelsCount; i++) volumes[i] = vol;
+    for (UINT32 i = 0; i < channelsCount; i++) volumes[i] = fVol;
     CHECK_HR(hr = m_pAudioVolume->SetAllVolumes(channelsCount, volumes));
-    m_vol = vol;
 
 done:
     return hr;

@@ -74,6 +74,7 @@ private:
 	HRESULT initAudioVolume();
 	HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActivate, IMFTopology** ppTopo);
 	void cancelAsyncLoad();
+	HRESULT doSetVolume(float fVol);
 
 	wil::com_ptr<IMFMediaSession> m_pSession;
 	wil::com_ptr<IMFMediaSource> m_pMediaSource;
@@ -90,6 +91,7 @@ private:
 	HWND m_ChildWnd;
 
 	float m_vol;
+	bool m_isUserAskPlaying;
 
 	// save parameters in OpenURL(), used to re-open when open failed
 	bool m_topoSet = false; // is topology set succesfully
