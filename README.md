@@ -34,8 +34,6 @@ But, since this package use Microsoft Media Foundation API, there are some limta
 
 ## Supported Formats in Windows (Important !)
 
-Reference: [Windows support media types][8]
-
 This package use Windows built-in Media Foundation API.
 So playback video will use the codecs preload in your Windows environment.
 All the media format can be played by WMP (Windows Media Player) can also be played by this package.
