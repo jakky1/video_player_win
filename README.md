@@ -34,6 +34,8 @@ But, since this package use Microsoft Media Foundation API, there are some limta
 
 ## Supported Formats in Windows (Important !)
 
+Reference: [Windows support media types][8]
+
 This package use Windows built-in Media Foundation API.
 So playback video will use the codecs preload in your Windows environment.
 All the media format can be played by WMP (Windows Media Player) can also be played by this package.
@@ -275,3 +277,4 @@ class _MyAppState extends State<MyApp> {
 [5]: https://pub.dev/packages/webview_win_floating "webview_win_floating"
 [6]: https://av1-video-extension.en.uptodown.com/windows "AV1 codec installer"
 [7]: https://apps.microsoft.com/store/detail/av1-video-extension/9MVZQVXJBQ9V?hl=en-us&gl=us "Microsoft Store AV1 codec"
+[8]: https://support.microsoft.com/en-us/topic/file-types-supported-by-windows-media-player-32d9998e-dc8f-af54-7ba1-e996f74375d9 "Windows support media types"
