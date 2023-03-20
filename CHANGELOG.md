@@ -1,3 +1,7 @@
+## 2.3.0
+
+* keep screen on (disable screensaver) while playing video.
+
 ## 2.2.0
 
 * Enhance performance
