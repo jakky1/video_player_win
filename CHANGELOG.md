@@ -1,4 +1,4 @@
-## 2.3.0
+## 2.2.2
 
 * Fix: shouldn't auto play when seeking in pause state
 * Fix: show the first frame when video loaded and Play() not called
