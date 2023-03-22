@@ -95,7 +95,6 @@ private:
 
 	// save parameters in OpenURL(), used to re-open when open failed
 	bool m_topoSet = false; // is topology set succesfully
-	std::function<void(void)> m_reopenFunc;
-	std::function<void(bool)> m_loadCallback;
+	std::function<void(std::function<void(bool)>)> m_reopenFunc;
 	//
 };

@@ -112,10 +112,9 @@ MyPlayer::~MyPlayer()
 HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
 {
     // save parameters in OpenURL(), used to re-open when open failed
-    m_loadCallback = loadCallback;
-    m_reopenFunc = [=]()
-    {
-        OpenURL(pszFileName, playerCallback, hwndVideo, loadCallback);
+    std::wstring filename = std::wstring(pszFileName);
+    m_reopenFunc = [=](std::function<void(bool)> cb) {
+        OpenURL(filename.c_str(), playerCallback, hwndVideo, cb);
     };
     //
 
@@ -126,9 +125,7 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
 
         if (pSource == NULL) {
             //load fail or abort
-            if (pSource) pSource->Release();
-            m_loadCallback(false);
-            m_loadCallback = NULL;
+            loadCallback(false);
             m_reopenFunc = NULL;
             return; // *this* maybe already deleted, so don't access any *this members, and return immediately!
         }
@@ -170,8 +167,8 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
     done:
         // Clean up.
         if (FAILED(hr)) Shutdown();
-        //loadCallback(SUCCEEDED(hr));
-        });
+        loadCallback(SUCCEEDED(hr));
+    });
 
     // Clean up.
     if (FAILED(hr)) Shutdown();
@@ -325,7 +322,7 @@ HRESULT MyPlayer::GetParameters(DWORD* pdwFlags, DWORD* pdwQueue)
 
 HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
 {
-    std::unique_lock<std::mutex> guard(m_mutex);
+    //std::unique_lock<std::mutex> guard(m_mutex);
     wil::com_ptr<MyPlayer> thisRef(this);
     HRESULT hr;
     wil::com_ptr<IMFMediaEvent> pEvent;
@@ -334,7 +331,6 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
     if (m_isShutdown || m_pSession == NULL) return E_FAIL;
     CHECK_HR(hr = m_pSession->EndGetEvent(pResult, &pEvent));
     CHECK_HR(hr = pEvent->GetType(&meType));
-    CHECK_HR(hr = m_pSession->BeginGetEvent(this, NULL));
 
     //std::cout << "native player event: " << meType << std::endl;
 
@@ -344,24 +340,26 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
                 // workaround: show the first frame when video loaded and Play() not called
                 Play();
                 Pause();
+            } else {
+                Play();
             }
             m_topoSet = true;
-            m_loadCallback(true);
-            m_loadCallback = NULL;
             m_reopenFunc = NULL;
-        } else if (meType == MESessionPaused && !m_topoSet) {
+        } else if (meType == MESessionPaused) {
             // workaround: something wrong with topology, re-open now
+            std::cout << "[video_player_win] load fail, reload now" << std::endl;
             Shutdown();
             m_isShutdown = false;
-            m_reopenFunc();
+            m_reopenFunc([=](bool bSuccess) {
+                if (!bSuccess) {
+                    OnPlayerEvent(MEError);
+                }
+            });
             return S_OK;
-        } else if (meType == MEError && !m_topoSet) {
-            m_loadCallback(false);
-            m_loadCallback = NULL;
-            m_reopenFunc = NULL;
         }
     }
 
+    CHECK_HR(hr = m_pSession->BeginGetEvent(this, NULL));
     switch (meType) {
     case MESessionStarted:
     case MEBufferingStarted:
