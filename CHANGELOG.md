@@ -2,6 +2,7 @@
 
 * Fix: shouldn't auto play when seeking in pause state
 * Fix: show the first frame when video loaded and Play() not called
+* Fix: prevent video freeze when call Play() twice
 * keep screen on (disable screensaver) while playing video.
 
 ## 2.2.0

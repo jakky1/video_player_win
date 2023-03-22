@@ -186,6 +186,7 @@ HRESULT MyPlayer::Play(LONGLONG ms)
 
     PROPVARIANT var;
     PropVariantInit(&var);
+    m_pSession->Pause(); //workaround: prevent video freeze when call Play() twice
     return m_pSession->Start(NULL, &var);
 }
 
