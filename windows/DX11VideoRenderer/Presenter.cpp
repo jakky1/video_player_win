@@ -13,7 +13,7 @@
 class MySwapChain1 : public IDXGISwapChain1 //create only 1 sharable texture to avoid copying resource
 {
 private:
-    int m_RefCount = 1;
+    long m_RefCount = 1;
     ID3D11Device* m_Device = NULL;
     ID3D11Texture2D* m_SharedTexture = NULL;
     D3D11_TEXTURE2D_DESC desc;
@@ -181,14 +181,12 @@ public:
     }
 
     ULONG AddRef() {
-        return ++m_RefCount;
+        return InterlockedIncrement(&m_RefCount);
     }
 
     ULONG Release() {
-        m_RefCount --;
-        if (m_RefCount <= 0) {
-            delete this;
-        }
+        InterlockedDecrement(&m_RefCount);
+        if (m_RefCount <= 0) delete this;
         return m_RefCount;
     }
 };
