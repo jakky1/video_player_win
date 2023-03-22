@@ -127,7 +127,9 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
         if (pSource == NULL) {
             //load fail or abort
             if (pSource) pSource->Release();
-            loadCallback(false);
+            m_loadCallback(false);
+            m_loadCallback = NULL;
+            m_reopenFunc = NULL;
             return; // *this* maybe already deleted, so don't access any *this members, and return immediately!
         }
         m_pMediaSource = pSource;
