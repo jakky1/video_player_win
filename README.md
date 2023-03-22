@@ -88,15 +88,15 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  video_player: ^2.4.7
-  video_player_win: ^1.1.0
+  video_player: ^2.5.1
+  video_player_win: ^2.0.0
 ```
 
 Or
 
 ```yaml
 dependencies:
-  video_player: ^2.4.7
+  video_player: ^2.5.1
   video_player_win:
     git:
       url: https://github.com/jakky1/video_player_win.git
