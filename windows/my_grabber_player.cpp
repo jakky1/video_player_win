@@ -337,6 +337,11 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
 
     if (!m_topoSet) {
         if (meType == MESessionNotifyPresentationTime) {
+            if (!m_isUserAskPlaying) {
+                // workaround: show the first frame when video loaded and Play() not called
+                Play();
+                Pause();
+            }
             m_topoSet = true;
             m_loadCallback(true);
             m_loadCallback = NULL;
