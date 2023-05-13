@@ -34,6 +34,8 @@ But, since this package use Microsoft Media Foundation API, there are some limta
 
 ## Supported Formats in Windows (Important !)
 
+Ref: [Windows preloaded codec list][8]
+
 This package use Windows built-in Media Foundation API.
 So playback video will use the codecs preload in your Windows environment.
 All the media format can be played by WMP (Windows Media Player) can also be played by this package.
@@ -77,7 +79,7 @@ Process.run('powershell', ['Add-AppxPackage', '-Path', 'E:\\av1-video-extension-
 
 If you build fail with this package, and the error message has the keyword "**MSB3073**":
 
-- run "**flutter build .**" in command line in [**Administrator**] mode
+- run "**flutter build windows**" in command line in [**Administrator**] mode
 
 
 # Quick Start
@@ -275,3 +277,4 @@ class _MyAppState extends State<MyApp> {
 [5]: https://pub.dev/packages/webview_win_floating "webview_win_floating"
 [6]: https://av1-video-extension.en.uptodown.com/windows "AV1 codec installer"
 [7]: https://apps.microsoft.com/store/detail/av1-video-extension/9MVZQVXJBQ9V?hl=en-us&gl=us "Microsoft Store AV1 codec"
+[8]: https://learn.microsoft.com/en-us/windows/win32/medfound/supported-media-formats-in-media-foundation "Windows preloaded codec list"
