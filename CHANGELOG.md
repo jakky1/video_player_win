@@ -1,3 +1,7 @@
+## 2.3.0
+* Fix: get player position directly from windows media foundation, not cached value.
+* support Dart 3.0
+
 ## 2.2.2
 
 * Fix: shouldn't auto play when seeking in pause state
