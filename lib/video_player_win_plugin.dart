@@ -27,7 +27,19 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
   @override
   Future<int?> create(DataSource dataSource) async {
     if (dataSource.sourceType == DataSourceType.file) {
-      var controller = WinVideoPlayerController.file(File(dataSource.uri!));
+      // dataSource.uri is url encoded and has a file:// scheme.
+      // But if the dataSource.uri original path contains non-ASCII characters,
+      // it will cause the IMFSourceResolver API url decoding to fail and cause
+      // the app to crash.
+      //
+      // To avoid this, need to pass dataSource.uri to Uri.parse() and get
+      // the path from uri.toFilePath(). It removes the file:// scheme and
+      // url decodes the path.
+      //
+      // Without the file:// scheme, the IMFSourceResolver API treats the "%"
+      // character as a normal string instead of url decoding the path.
+      var uri = Uri.parse(dataSource.uri!);
+      var controller = WinVideoPlayerController.file(File(uri.toFilePath()));
       await controller.initialize();
       return controller.textureId_ > 0 ? controller.textureId_ : null;
     } else if (dataSource.sourceType == DataSourceType.network) {
