@@ -1,7 +1,5 @@
 # video_player_win
 
-![pub version][visits-count-image]
-
 [visits-count-image]: https://img.shields.io/badge/dynamic/json?label=Visits%20Count&query=value&url=https://api.countapi.xyz/hit/jakky1_video_player_win/visits
 
 Flutter video player for Windows, lightweight, using Windows built-in Media Foundation API.
