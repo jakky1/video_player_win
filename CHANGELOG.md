@@ -1,6 +1,6 @@
 ## 2.3.1
 
-* Fix: cannot playe video path containing non-ASCII characters
+* Fix: cannot play video path containing non-ASCII characters
 
 ## 2.3.0
 * Fix: get player position directly from windows media foundation, not cached value.
