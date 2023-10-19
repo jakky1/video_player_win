@@ -1,3 +1,7 @@
+## 2.3.2
+
+* Fix: sometimes crash when closing player
+
 ## 2.3.1
 
 * Fix: cannot play video path containing non-ASCII characters
