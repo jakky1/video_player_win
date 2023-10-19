@@ -298,12 +298,8 @@ void MyPlayer::Shutdown()
     //       so we need to call m_pSession->Shutdown() first
     //       then client call player->Release() will make refCount = 0
     if (m_pSession) {
-        m_pSession->Stop();
-        if (m_pVideoSinkActivate.get() != NULL) m_pVideoSinkActivate->ShutdownObject();
-        if (m_pAudioRendererActivate.get() != NULL) m_pAudioRendererActivate->ShutdownObject();
         m_pSession->Shutdown();
-        m_pMediaSource->Shutdown();
-        m_pSession->Close();
+        m_pMediaSource->Shutdown(); // will memory-leak if not shutdown
     }
 }
 
