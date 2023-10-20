@@ -16,6 +16,7 @@ class WinVideoPlayerValue {
   final bool isInitialized;
   final bool isLooping;
   final bool isPlaying;
+  final bool isCompleted;
   final double playbackSpeed;
   final Duration position;
   final Size size;
@@ -37,6 +38,7 @@ class WinVideoPlayerValue {
     this.isPlaying = false,
     this.isLooping = false,
     this.isBuffering = false,
+    this.isCompleted = false,
     this.volume = 1.0,
     this.playbackSpeed = 1.0,
     //int rotationCorrection = 0,
@@ -50,6 +52,7 @@ class WinVideoPlayerValue {
     bool? isInitialized,
     bool? isLooping,
     bool? isPlaying,
+    bool? isCompleted,
     double? playbackSpeed,
     Duration? position,
     Size? size,
@@ -62,6 +65,7 @@ class WinVideoPlayerValue {
       isInitialized: isInitialized ?? this.isInitialized,
       isLooping: isLooping ?? this.isLooping,
       isPlaying: isPlaying ?? this.isPlaying,
+      isCompleted: isCompleted ?? this.isCompleted,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       position: position ?? this.position,
       size: size ?? this.size,
@@ -157,16 +161,22 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         break;
       case 3: // MESessionStarted , occurs when user call play() or seekTo() in playing mode
         //log("[video_player_win] playback event: playing");
-        value = value.copyWith(isInitialized: true, isPlaying: true);
+        value = value.copyWith(isInitialized: true, isPlaying: true, isCompleted: false);
         _startTrackingPosition(_lastSeekId);
+        _eventStreamController
+            .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 4: // MESessionPaused
         //log("[video_player_win] playback event: paused");
         value = value.copyWith(isPlaying: false);
+        _eventStreamController
+            .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 5: // MESessionStopped
         log("[video_player_win] playback event: stopped");
         value = value.copyWith(isPlaying: false);
+        _eventStreamController
+            .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 6: // MESessionEnded
         log("[video_player_win] playback event: play ended");
@@ -175,12 +185,9 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         if (_isLooping) {
           seekTo(Duration.zero);
         } else {
-          // TODO: DO NOT send VideoEventType.completed to package [video_player]
-          // because [video_player] will call pause() then call seekTo(videoDuration)
-          // but seekTo in Windows cause play automatically
-          // since it start play again at the end, ,then we receive MESessionEnded again !
-          // and so on recurivly...
-          //_eventStreamController.add(VideoEvent(eventType: VideoEventType.completed));
+          value = value.copyWith(isCompleted: true);
+          _eventStreamController
+              .add(VideoEvent(eventType: VideoEventType.completed));
         }
         break;
       case 7: // MEError
@@ -228,7 +235,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   int _lastSeekPos = -1;
   Future<void> seekTo(Duration time) {
     if (!value.isInitialized) throw ArgumentError("video file not opened yet");
-    value = value.copyWith(position: time);
+    value = value.copyWith(position: time, isCompleted: false);
 
     if (dataSourceType == WinDataSourceType.network) {
       // for network source, we delay 300ms for each seekTo() call, and cancel last seekTo() call if next seekTo() called in 300ms
