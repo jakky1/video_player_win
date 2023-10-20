@@ -39,11 +39,11 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
       // Without the file:// scheme, the IMFSourceResolver API treats the "%"
       // character as a normal string instead of url decoding the path.
       var uri = Uri.parse(dataSource.uri!);
-      var controller = WinVideoPlayerController.file(File(uri.toFilePath()));
+      var controller = WinVideoPlayerController.file(File(uri.toFilePath()), isBridgeMode: true);
       await controller.initialize();
       return controller.textureId_ > 0 ? controller.textureId_ : null;
     } else if (dataSource.sourceType == DataSourceType.network) {
-      var controller = WinVideoPlayerController.network(dataSource.uri!);
+      var controller = WinVideoPlayerController.network(dataSource.uri!, isBridgeMode: true);
       await controller.initialize();
       return controller.textureId_ > 0 ? controller.textureId_ : null;
     } else {

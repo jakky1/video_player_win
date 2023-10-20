@@ -75,13 +75,15 @@ class WinVideoPlayerValue {
 }
 
 class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
+  late final bool _isBridgeMode; // true if used by 'video_player' package
   int textureId_ = -1;
   final String dataSource;
   late final WinDataSourceType dataSourceType;
   bool _isLooping = false;
 
-  final _eventStreamController = StreamController<
-      VideoEvent>(); // used for flutter official "video_player" package
+  // used by flutter official "video_player" package
+  final _eventStreamController = StreamController<VideoEvent>();
+
   Stream<VideoEvent> get videoEventStream => _eventStreamController.stream;
 
   Future<Duration?> get position async {
@@ -89,7 +91,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     return Duration(milliseconds: pos);
   }
 
-  WinVideoPlayerController._(this.dataSource, this.dataSourceType)
+  WinVideoPlayerController._(this.dataSource, this.dataSourceType,
+      {bool isBridgeMode = false})
       : super(WinVideoPlayerValue()) {
     if (dataSourceType == WinDataSourceType.contentUri) {
       throw UnsupportedError(
@@ -100,6 +103,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
           "VideoPlayerController.asset() not implement yet.");
     }
 
+    _isBridgeMode = isBridgeMode;
     _finalizer.attach(this, this, detach: this);
     //VideoPlayerWinPlatform.instance.registerPlayer(_textureId, this);
   }
@@ -110,38 +114,40 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     VideoPlayerWinPlatform.instance.unregisterPlayer(player.textureId_);
   });
 
-  WinVideoPlayerController.file(File file)
-      : this._(file.path, WinDataSourceType.file);
-  WinVideoPlayerController.network(String dataSource)
-      : this._(dataSource, WinDataSourceType.network);
+  WinVideoPlayerController.file(File file, {bool isBridgeMode = false})
+      : this._(file.path, WinDataSourceType.file, isBridgeMode: isBridgeMode);
+  WinVideoPlayerController.network(String dataSource,
+      {bool isBridgeMode = false})
+      : this._(dataSource, WinDataSourceType.network,
+            isBridgeMode: isBridgeMode);
   WinVideoPlayerController.asset(String dataSource, {String? package})
       : this._(dataSource, WinDataSourceType.asset);
   WinVideoPlayerController.contentUri(Uri contentUri)
       : this._("", WinDataSourceType.contentUri);
 
-  int _lastSeekId =
-      0; // +1 every time when seekTo() called, to cancel all getCurrentPosition() called before seekTo()
-  void _cancelTrackingPosition() => _lastSeekId++;
-  void _startTrackingPosition(int seekId) async {
-    // update position value for every 1000 ms
-    int delay = 1000 - (value.position.inMilliseconds % 1000);
-    delay = delay ~/ value.playbackSpeed + 1;
-    await Future.delayed(Duration(milliseconds: delay));
+  Timer? _positionTimer;
+  void _cancelTrackingPosition() => _positionTimer?.cancel();
+  void _startTrackingPosition() async {
 
-    // NOTE: DO NOT call getCurrentPosition() during seeking, because windows will return 0...
-    if (textureId_ == -1 ||
-        !value.isInitialized ||
-        !value.isPlaying ||
-        (seekId != _lastSeekId)) return;
+    // NOTE: 'video_player' package already auto get position periodically,
+    // so do nothing if _isBridgeMode = true
+    if (_isBridgeMode) return;
 
-    var pos = await _getCurrentPosition();
-    if (pos < 0 ||
-        textureId_ == -1 ||
-        !value.isInitialized ||
-        (seekId != _lastSeekId)) return;
-    value = value.copyWith(position: Duration(milliseconds: pos));
+    _positionTimer =
+        Timer.periodic(const Duration(milliseconds: 300), (Timer timer) async {
+      if (!value.isInitialized || value.hasError) {
+        timer.cancel();
+        return;
+      }
 
-    _startTrackingPosition(seekId);
+      //log("[video_player_win] ui: position timer tick");
+      final pos = await position;
+      value = value.copyWith(position: pos);
+
+      if (!value.isPlaying || value.isCompleted) {
+        timer.cancel();
+      }
+    });
   }
 
   void onPlaybackEvent_(int state) {
@@ -161,31 +167,34 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         break;
       case 3: // MESessionStarted , occurs when user call play() or seekTo() in playing mode
         //log("[video_player_win] playback event: playing");
-        value = value.copyWith(isInitialized: true, isPlaying: true, isCompleted: false);
-        _startTrackingPosition(_lastSeekId);
+        value = value.copyWith(
+            isInitialized: true, isPlaying: true, isCompleted: false);
+        _startTrackingPosition();
         _eventStreamController
             .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 4: // MESessionPaused
         //log("[video_player_win] playback event: paused");
         value = value.copyWith(isPlaying: false);
+        _cancelTrackingPosition();
         _eventStreamController
             .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 5: // MESessionStopped
         log("[video_player_win] playback event: stopped");
         value = value.copyWith(isPlaying: false);
+        _cancelTrackingPosition();
         _eventStreamController
             .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 6: // MESessionEnded
         log("[video_player_win] playback event: play ended");
-        _cancelTrackingPosition();
         value = value.copyWith(isPlaying: false, position: value.duration);
         if (_isLooping) {
           seekTo(Duration.zero);
         } else {
           value = value.copyWith(isCompleted: true);
+          _cancelTrackingPosition();
           _eventStreamController
               .add(VideoEvent(eventType: VideoEventType.completed));
         }
@@ -194,6 +203,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         log("[video_player_win] playback event: error");
         value = value.copyWith(
             isInitialized: false, hasError: true, isPlaying: false);
+        _cancelTrackingPosition();
         break;
     }
   }
@@ -229,60 +239,20 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     await VideoPlayerWinPlatform.instance.pause(textureId_);
   }
 
-  Timer? _seekTimer;
-  Completer? completer;
-  late Future<void> _lastSeekFuture;
-  int _lastSeekPos = -1;
-  Future<void> seekTo(Duration time) {
+  Future<void> seekTo(Duration time) async {
     if (!value.isInitialized) throw ArgumentError("video file not opened yet");
+
+    await VideoPlayerWinPlatform.instance
+        .seekTo(textureId_, time.inMilliseconds);
     value = value.copyWith(position: time, isCompleted: false);
-
-    if (dataSourceType == WinDataSourceType.network) {
-      // for network source, we delay 300ms for each seekTo() call, and cancel last seekTo() call if next seekTo() called in 300ms
-      _lastSeekPos = time.inMilliseconds;
-      if (completer == null) {
-        _cancelTrackingPosition();
-        completer = Completer();
-        _lastSeekFuture = completer!.future;
-      }
-
-      _seekTimer?.cancel();
-      _seekTimer = Timer(const Duration(milliseconds: 300), () async {
-        _cancelTrackingPosition();
-        await VideoPlayerWinPlatform.instance.seekTo(textureId_, _lastSeekPos);
-        completer!.complete();
-        completer = null;
-      });
-      return _lastSeekFuture;
-    } else {
-      // for non-network source, we call seekTo() every 300ms
-      if (_seekTimer != null) {
-        _lastSeekPos = time.inMilliseconds;
-        return _lastSeekFuture;
-      } else {
-        completer = Completer();
-        _lastSeekFuture = completer!.future;
-        _seekTimer = Timer(const Duration(milliseconds: 300), () async {
-          // avoid user call seekTo() many times in a short time
-          _seekTimer = null;
-          if (_lastSeekPos >= 0) {
-            seekTo(Duration(milliseconds: _lastSeekPos)).then((_) {
-              completer!.complete();
-            });
-            _lastSeekPos = -1;
-          }
-        });
-
-        _cancelTrackingPosition();
-        return VideoPlayerWinPlatform.instance
-            .seekTo(textureId_, time.inMilliseconds);
-      }
-    }
   }
 
   Future<int> _getCurrentPosition() async {
     if (!value.isInitialized) throw ArgumentError("video file not opened yet");
-    return await VideoPlayerWinPlatform.instance.getCurrentPosition(textureId_);
+    int pos =
+        await VideoPlayerWinPlatform.instance.getCurrentPosition(textureId_);
+    value = value.copyWith(position: Duration(milliseconds: pos));
+    return pos;
   }
 
   Future<void> setPlaybackSpeed(double speed) async {
@@ -299,6 +269,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
   Future<void> setLooping(bool looping) async {
     _isLooping = looping;
+    value = value.copyWith(isLooping: looping);
   }
 
   @override
