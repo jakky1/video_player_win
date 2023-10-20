@@ -209,6 +209,12 @@ LONGLONG MyPlayer::GetCurrentPosition()
     if (m_pSession == NULL) return -1;
     hr = m_pClock->GetTime(&pos);
     if (FAILED(hr)) return -1;
+
+    // during seeking operation, m_pClock->GetTime() may return 0
+    // so we should return the last GetTime() value
+    if (pos == 0) return m_lastPosition / 10000;
+    else m_lastPosition = pos;
+
     return pos / 10000;
 }
 
@@ -226,6 +232,7 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
     HRESULT hr = m_pSession->Start(NULL, &var);
     if (!m_isUserAskPlaying) m_pSession->Pause();
 
+    m_lastPosition = ms * 10000;
     return hr;
 }
 
