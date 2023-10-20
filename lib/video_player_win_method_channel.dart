@@ -13,7 +13,7 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('video_player_win');
 
-  final playerMap = <int, WinVideoPlayerController>{};
+  final playerMap = <int, WeakReference<WinVideoPlayerController>>{};
 
   MethodChannelVideoPlayerWin() {
     methodChannel.setMethodCallHandler((call) async {
@@ -28,7 +28,7 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
 
       if (call.method == "OnPlaybackEvent") {
         int state = call.arguments["state"]!;
-        player.onPlaybackEvent_(state);
+        player.target?.onPlaybackEvent_(state);
       } else {
         assert(false, "unknown call from native: ${call.method}");
       }
@@ -42,7 +42,7 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
 
   @override
   WinVideoPlayerController? getPlayerByTextureId(int textureId) {
-    return playerMap[textureId];
+    return playerMap[textureId]?.target;
   }
 
   @override
@@ -67,7 +67,7 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
     );
 
     value.textureId = arguments["textureId"];
-    playerMap[value.textureId] = player;
+    playerMap[value.textureId] = WeakReference<WinVideoPlayerController>(player);
     return value;
   }
 

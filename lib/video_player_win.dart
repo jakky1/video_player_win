@@ -104,14 +104,12 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     }
 
     _isBridgeMode = isBridgeMode;
-    _finalizer.attach(this, this, detach: this);
     //VideoPlayerWinPlatform.instance.registerPlayer(_textureId, this);
   }
-  static final Finalizer<WinVideoPlayerController> _finalizer =
-      Finalizer((player) {
-    // TODO: this finalizer seems not called...
-    player.dispose();
-    VideoPlayerWinPlatform.instance.unregisterPlayer(player.textureId_);
+  static final Finalizer<int> _finalizer = Finalizer((textureId) {
+    log("[video_player_win] gc free a player that didn't dispose() yet !!!!!");
+    VideoPlayerWinPlatform.instance.unregisterPlayer(textureId);
+    VideoPlayerWinPlatform.instance.dispose(textureId);
   });
 
   WinVideoPlayerController.file(File file, {bool isBridgeMode = false})
@@ -128,7 +126,6 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   Timer? _positionTimer;
   void _cancelTrackingPosition() => _positionTimer?.cancel();
   void _startTrackingPosition() async {
-
     // NOTE: 'video_player' package already auto get position periodically,
     // so do nothing if _isBridgeMode = true
     if (_isBridgeMode) return;
@@ -142,7 +139,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
       //log("[video_player_win] ui: position timer tick");
       final pos = await position;
-      value = value.copyWith(position: pos);
+      if (textureId_ > 0) value = value.copyWith(position: pos);
 
       if (!value.isPlaying || value.isCompleted) {
         timer.cancel();
@@ -220,6 +217,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     }
     textureId_ = pv.textureId;
     value = pv;
+    _finalizer.attach(this, textureId_, detach: this);
 
     _eventStreamController.add(VideoEvent(
       eventType: VideoEventType.initialized,
@@ -251,6 +249,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     if (!value.isInitialized) throw ArgumentError("video file not opened yet");
     int pos =
         await VideoPlayerWinPlatform.instance.getCurrentPosition(textureId_);
+
+    if (textureId_ < 0) return 0;
     value = value.copyWith(position: Duration(milliseconds: pos));
     return pos;
   }
@@ -276,6 +276,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   Future<void> dispose() async {
     VideoPlayerWinPlatform.instance.unregisterPlayer(textureId_);
     await VideoPlayerWinPlatform.instance.dispose(textureId_);
+
+    _finalizer.detach(this);
     _cancelTrackingPosition();
 
     textureId_ = -1;
