@@ -1,3 +1,9 @@
+## 2.3.4
+
+* Fix: getCurrentPosition() shouldn't return 0 during seeking
+* support controller.value.isCompleted
+* auto call dispose() when controller garbage-collected
+
 ## 2.3.2
 
 * Fix: sometimes crash when closing player
