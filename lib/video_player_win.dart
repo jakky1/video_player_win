@@ -130,20 +130,20 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     // so do nothing if _isBridgeMode = true
     if (_isBridgeMode) return;
 
+    _positionTimer?.cancel();
     _positionTimer =
         Timer.periodic(const Duration(milliseconds: 300), (Timer timer) async {
-      if (!value.isInitialized || value.hasError) {
+
+      if (!value.isInitialized
+          || !value.isPlaying
+          || value.isCompleted
+          || value.hasError) {
         timer.cancel();
         return;
       }
 
       //log("[video_player_win] ui: position timer tick");
-      final pos = await position;
-      if (textureId_ > 0) value = value.copyWith(position: pos);
-
-      if (!value.isPlaying || value.isCompleted) {
-        timer.cancel();
-      }
+      await position; // set player's position to value.position
     });
   }
 
@@ -185,13 +185,12 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
             .add(VideoEvent(eventType: VideoEventType.isPlayingStateUpdate));
         break;
       case 6: // MESessionEnded
-        log("[video_player_win] playback event: play ended");
-        value = value.copyWith(isPlaying: false, position: value.duration);
+        //log("[video_player_win] playback event: play ended");
         if (_isLooping) {
           seekTo(Duration.zero);
         } else {
-          value = value.copyWith(isCompleted: true);
           _cancelTrackingPosition();
+          value = value.copyWith(isCompleted: true, position: value.duration);
           _eventStreamController
               .add(VideoEvent(eventType: VideoEventType.completed));
         }
@@ -247,6 +246,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
   Future<int> _getCurrentPosition() async {
     if (!value.isInitialized) throw ArgumentError("video file not opened yet");
+    if (value.isCompleted) return value.duration.inMilliseconds;
     int pos =
         await VideoPlayerWinPlatform.instance.getCurrentPosition(textureId_);
 

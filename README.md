@@ -163,6 +163,7 @@ void onPlaybackEvent() {
 	// value.duration (Duration)
 	// value.isPlaying (bool)
 	// value.isBuffering (bool)
+	// value.isCompleted (bool)
 	// value.position (Duration)
 }
 controller.addListener(onPlaybackEvent);
