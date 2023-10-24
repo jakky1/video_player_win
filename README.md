@@ -26,6 +26,10 @@ Features:
 - Only one dll file (~180 KB) added as a plugin.
 - Support Windows / Android / iOS / Web by collaboration with [video_player][1]
 
+Limitations:
+- This package doesn't support HLS (.m3u8)
+
+
 But, since this package use Microsoft Media Foundation API, there are some limtations:
 
 - Playback will use codecs preloaded in Windows OS. If you want to play some video format that not supported by these preloaded codecs, you need to install 3rd-party codecs exe file, about 18 MB. (see the next section).
