@@ -20,6 +20,8 @@ class VideoPlayerWinPlugin : public flutter::Plugin {
   VideoPlayerWinPlugin(const VideoPlayerWinPlugin&) = delete;
   VideoPlayerWinPlugin& operator=(const VideoPlayerWinPlugin&) = delete;
 
+  static std::optional<LRESULT> HandleWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
  private:
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(

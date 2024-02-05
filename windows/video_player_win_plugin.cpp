@@ -18,6 +18,8 @@
 #include <Shlwapi.h>
 #include <stdio.h>
 
+#define WM_FLUTTER_TASK (WM_APP + 101)
+
 // Jacky {
 flutter::PluginRegistrarWindows *g_registrar; // Jacky
 
@@ -168,10 +170,11 @@ private:
         return;
     }
 
-    flutter::EncodableMap arguments;
-    arguments[flutter::EncodableValue("textureId")] = flutter::EncodableValue(textureId);
-    arguments[flutter::EncodableValue("state")] = flutter::EncodableValue(mPlaybackState);
-    gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
+    HWND hwnd = g_registrar->GetView()->GetNativeWindow();
+    if (hwnd != NULL && IsWindow(hwnd))
+    {
+      PostMessage(GetParent(hwnd), WM_FLUTTER_TASK, textureId, mPlaybackState);
+    }
   }
 
   void initTexture(ID3D11Texture2D* texture)
@@ -279,6 +282,26 @@ void VideoPlayerWinPlugin::RegisterWithRegistrar(
           &flutter::StandardMethodCodec::GetInstance()); //Jacky
 
   g_registrar = registrar; //Jacky
+
+  registrar->RegisterTopLevelWindowProcDelegate(
+    [&](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+      return HandleWindowProc(hWnd, message, wParam, lParam);
+    });
+}
+
+std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  if (WM_FLUTTER_TASK != message)
+  {
+    return 0;
+  }
+  flutter::EncodableMap arguments;
+  arguments[flutter::EncodableValue("textureId")] = flutter::EncodableValue((INT64)wParam);
+  arguments[flutter::EncodableValue("state")] = flutter::EncodableValue((int)lParam);
+  gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
+  // std::cout << "OnPlaybackEvent textureId: " << wParam << ", state: " << lParam << std::endl;
+  return 0;
 }
 
 VideoPlayerWinPlugin::VideoPlayerWinPlugin() {}
