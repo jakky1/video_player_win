@@ -263,6 +263,7 @@ namespace video_player_win {
 // static
 void VideoPlayerWinPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
+  g_registrar = registrar; //Jacky
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "video_player_win",
@@ -280,14 +281,6 @@ void VideoPlayerWinPlugin::RegisterWithRegistrar(
   texture_registar_ = registrar->texture_registrar(); //Jacky
   gMethodChannel = new flutter::MethodChannel<flutter::EncodableValue>(registrar->messenger(), "video_player_win",
           &flutter::StandardMethodCodec::GetInstance()); //Jacky
-
-  g_registrar = registrar; //Jacky
-
-  registrar->RegisterTopLevelWindowProcDelegate(
-    [&](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-    {
-      return HandleWindowProc(hWnd, message, wParam, lParam);
-    });
 }
 
 std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -304,9 +297,19 @@ std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT me
   return 0;
 }
 
-VideoPlayerWinPlugin::VideoPlayerWinPlugin() {}
+VideoPlayerWinPlugin::VideoPlayerWinPlugin() {
+  window_proc_id = g_registrar->RegisterTopLevelWindowProcDelegate(
+  [&](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+  {
+    return HandleWindowProc(hWnd, message, wParam, lParam);
+  });
+}
 
 VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {
+  if(window_proc_id != -1) {
+    g_registrar->UnregisterTopLevelWindowProcDelegate(window_proc_id);
+    window_proc_id = -1;
+  }
   texture_registar_ = NULL; //Jacky
   MFShutdown();
 }
