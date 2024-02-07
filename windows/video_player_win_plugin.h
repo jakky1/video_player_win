@@ -20,7 +20,12 @@ class VideoPlayerWinPlugin : public flutter::Plugin {
   VideoPlayerWinPlugin(const VideoPlayerWinPlugin&) = delete;
   VideoPlayerWinPlugin& operator=(const VideoPlayerWinPlugin&) = delete;
 
+  static std::optional<LRESULT> HandleWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
  private:
+   // The ID of the WindowProc delegate registration.
+  int window_proc_id = -1;
+
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
