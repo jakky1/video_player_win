@@ -285,9 +285,10 @@ void VideoPlayerWinPlugin::RegisterWithRegistrar(
 
 std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+  std::optional<LRESULT> result = std::nullopt;
   if (WM_FLUTTER_TASK != message)
   {
-    return 0;
+    return result;
   }
   flutter::EncodableMap arguments;
   arguments[flutter::EncodableValue("textureId")] = flutter::EncodableValue((INT64)wParam);
