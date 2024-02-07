@@ -18,7 +18,7 @@
 #include <Shlwapi.h>
 #include <stdio.h>
 
-#define WM_FLUTTER_TASK (WM_APP + 101)
+#define WM_FLUTTER_TASK (WM_APP + 8898)
 
 // Jacky {
 flutter::PluginRegistrarWindows *g_registrar; // Jacky
@@ -174,6 +174,10 @@ private:
     if (hwnd != NULL && IsWindow(hwnd))
     {
       PostMessage(GetParent(hwnd), WM_FLUTTER_TASK, textureId, mPlaybackState);
+    }
+    else
+    {
+      std::cout << "[video_player_win] hwnd is not a window." << std::endl;
     }
   }
 
