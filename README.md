@@ -1,7 +1,5 @@
 # video_player_win
 
-![pub version][visits-count-image]
-
 [visits-count-image]: https://img.shields.io/badge/dynamic/json?label=Visits%20Count&query=value&url=https://api.countapi.xyz/hit/jakky1_video_player_win/visits
 
 Flutter video player for Windows, lightweight, using Windows built-in Media Foundation API.
@@ -27,6 +25,10 @@ Features:
 - No GPL / LGPL 3rd-party libraries inside.
 - Only one dll file (~180 KB) added as a plugin.
 - Support Windows / Android / iOS / Web by collaboration with [video_player][1]
+
+Limitations:
+- This package doesn't support HLS (.m3u8)
+
 
 But, since this package use Microsoft Media Foundation API, there are some limtations:
 
@@ -165,6 +167,7 @@ void onPlaybackEvent() {
 	// value.duration (Duration)
 	// value.isPlaying (bool)
 	// value.isBuffering (bool)
+	// value.isCompleted (bool)
 	// value.position (Duration)
 }
 controller.addListener(onPlaybackEvent);

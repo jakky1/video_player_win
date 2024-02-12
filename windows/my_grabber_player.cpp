@@ -209,6 +209,12 @@ LONGLONG MyPlayer::GetCurrentPosition()
     if (m_pSession == NULL) return -1;
     hr = m_pClock->GetTime(&pos);
     if (FAILED(hr)) return -1;
+
+    // during seeking operation, m_pClock->GetTime() may return 0
+    // so we should return the last GetTime() value
+    if (pos == 0) return m_lastPosition / 10000;
+    else m_lastPosition = pos;
+
     return pos / 10000;
 }
 
@@ -226,6 +232,7 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
     HRESULT hr = m_pSession->Start(NULL, &var);
     if (!m_isUserAskPlaying) m_pSession->Pause();
 
+    m_lastPosition = ms * 10000;
     return hr;
 }
 
@@ -298,12 +305,8 @@ void MyPlayer::Shutdown()
     //       so we need to call m_pSession->Shutdown() first
     //       then client call player->Release() will make refCount = 0
     if (m_pSession) {
-        m_pSession->Stop();
-        if (m_pVideoSinkActivate.get() != NULL) m_pVideoSinkActivate->ShutdownObject();
-        if (m_pAudioRendererActivate.get() != NULL) m_pAudioRendererActivate->ShutdownObject();
         m_pSession->Shutdown();
-        m_pMediaSource->Shutdown();
-        m_pSession->Close();
+        m_pMediaSource->Shutdown(); // will memory-leak if not shutdown
     }
 }
 

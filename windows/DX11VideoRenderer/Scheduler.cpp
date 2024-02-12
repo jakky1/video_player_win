@@ -136,6 +136,15 @@ HRESULT DX11VideoRenderer::CScheduler::StartScheduler(IMFClock* pClock)
 
 HRESULT DX11VideoRenderer::CScheduler::StopScheduler(void)
 {
+    CAutoLock lock(&m_critSec);
+
+    if (m_keyTimer != 0) // Jacky {}
+    {
+        (void)MFCancelWorkItem(m_keyTimer);
+        m_keyTimer = 0;
+    }
+
+
     if (m_hWaitTimer != NULL)
     {
         CloseHandle(m_hWaitTimer);

@@ -92,6 +92,7 @@ private:
 
 	float m_vol;
 	bool m_isUserAskPlaying;
+	LONGLONG m_lastPosition = 0;
 
 	// save parameters in OpenURL(), used to re-open when open failed
 	bool m_topoSet = false; // is topology set succesfully

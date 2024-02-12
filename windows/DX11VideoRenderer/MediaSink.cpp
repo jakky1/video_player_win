@@ -340,6 +340,12 @@ HRESULT DX11VideoRenderer::CMediaSink::Shutdown(void)
 
     m_IsShutdown = TRUE;
 
+    if (m_pScheduler != NULL)
+    {
+        // Jacky: must stop scheduler before media shutdown
+        hr = m_pScheduler->StopScheduler();
+    }
+
     if (m_pStream != NULL)
     {
         m_pStream->Shutdown();
@@ -353,12 +359,6 @@ HRESULT DX11VideoRenderer::CMediaSink::Shutdown(void)
     SafeRelease(m_pClock);
     SafeRelease(m_pStream);
     SafeRelease(m_pPresenter);
-
-    if (m_pScheduler != NULL)
-    {
-        hr = m_pScheduler->StopScheduler();
-    }
-
     SafeRelease(m_pScheduler);
 
     return hr;
