@@ -1,3 +1,7 @@
+## 2.3.5
+
+* update README: no need to call registerWith()
+
 ## 2.3.4
 
 * Fix: getCurrentPosition() shouldn't return 0 during seeking
