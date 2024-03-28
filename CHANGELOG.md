@@ -1,3 +1,7 @@
+## 2.3.6
+
+* Fix: controller.setPlaybackSpeed() not working
+
 ## 2.3.5
 
 * update README: no need to call registerWith()

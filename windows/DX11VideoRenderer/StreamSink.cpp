@@ -981,58 +981,13 @@ HRESULT DX11VideoRenderer::CStreamSink::PresentFrame(void)
 
 HRESULT DX11VideoRenderer::CStreamSink::GetMaxRate(BOOL fThin, float* pflRate)
 {
-    HRESULT hr = S_OK;
-    DWORD dwMonitorRefreshRate = 0;
-    UINT32 unNumerator = 0;
-    UINT32 unDenominator = 0;
-
-    do
+    if (pflRate == NULL)
     {
-        hr = m_pPresenter->GetMonitorRefreshRate(&dwMonitorRefreshRate);
-        if (FAILED(hr))
-        {
-            break;
-        }
-
-        if (m_pCurrentType == NULL)
-        {
-            hr = MF_E_INVALIDREQUEST;
-            break;
-        }
-
-        if (fThin == TRUE)
-        {
-            *pflRate = FLT_MAX;
-            break;
-        }
-
-        MFGetAttributeRatio(m_pCurrentType, MF_MT_FRAME_RATE, &unNumerator, &unDenominator);
-
-        if (unNumerator == 0 || unDenominator == 0)
-        {
-            // We support anything.
-            *pflRate = FLT_MAX;
-        }
-        else
-        {
-            if (MFVideoInterlace_FieldInterleavedUpperFirst == m_unInterlaceMode ||
-                MFVideoInterlace_FieldInterleavedLowerFirst == m_unInterlaceMode ||
-                MFVideoInterlace_FieldSingleUpper == m_unInterlaceMode           ||
-                MFVideoInterlace_FieldSingleLower == m_unInterlaceMode           ||
-                MFVideoInterlace_MixedInterlaceOrProgressive == m_unInterlaceMode)
-            {
-                unNumerator*=2;
-            }
-
-            //
-            // Only support rates up to the refresh rate of the monitor.
-            //
-            *pflRate = (float)MulDiv(dwMonitorRefreshRate, unDenominator, unNumerator);
-        }
+        return E_FAIL;
     }
-    while (FALSE);
 
-    return hr;
+    *pflRate = 3.0f;
+    return S_OK;
 }
 
 //-------------------------------------------------------------------
