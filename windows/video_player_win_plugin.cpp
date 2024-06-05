@@ -246,7 +246,7 @@ MyPlayerInternal* getPlayerById(int64_t textureId, bool autoCreate = false) {
   return data;
 }
 
-void destroyPlayerById(int64_t textureId) {
+void destroyPlayerById(int64_t textureId, bool toRelease) {
   std::lock_guard<std::mutex> lock(mapMutex);
   MyPlayerInternal* data = playerMap[textureId];
   if (data == NULL) return;
@@ -256,7 +256,11 @@ void destroyPlayerById(int64_t textureId) {
     data->textureId = -1;
   }
 
-  data->Release();
+  if (toRelease) {
+    data->Release();
+  } else {
+    data->Shutdown();
+  }
   //std::cout << "native destroy player id: " << textureId << std::endl;
 }
 
@@ -373,7 +377,9 @@ void VideoPlayerWinPlugin::HandleMethodCall(
         map[flutter::EncodableValue("volume")] = flutter::EncodableValue((double)volume);
         shared_result->Success(flutter::EncodableValue(map));
       } else {
-        destroyPlayerById(player->textureId);
+        // TODO: call destroyPlayerById(true) when open video failed here will crash since player->Release() called... how to fix?
+        destroyPlayerById(player->textureId, false);
+
         flutter::EncodableMap map;
         map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
         shared_result->Success(map);
@@ -415,7 +421,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     player->Shutdown();
     result->Success(flutter::EncodableValue(true));
   } else if (method_call.method_name().compare("dispose") == 0) {
-    destroyPlayerById(textureId);
+    destroyPlayerById(textureId, true);
     result->Success(flutter::EncodableValue(true));
   } else {
     result->NotImplemented();
