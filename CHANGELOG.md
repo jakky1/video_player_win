@@ -1,3 +1,7 @@
+## 2.3.7
+
+* Fix: crash when open wrong file path or url.
+
 ## 2.3.6
 
 * Fix: controller.setPlaybackSpeed() not working
