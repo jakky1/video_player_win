@@ -12,6 +12,8 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
     VideoPlayerPlatform.instance = WindowsVideoPlayer();
   }
 
+  final mControllerMap = <int, WinVideoPlayerController>{};
+
   @override
   Future<void> init() async {
     // do nothing...
@@ -23,6 +25,7 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
     var controller =
         VideoPlayerWinPlatform.instance.getPlayerByTextureId(textureId);
     await controller?.dispose();
+    mControllerMap.remove(textureId);
   }
 
   /// Creates an instance of a video player and returns its textureId.
@@ -44,12 +47,19 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
       var controller = WinVideoPlayerController.file(File(uri.toFilePath()),
           isBridgeMode: true);
       await controller.initialize();
-      return controller.textureId_ > 0 ? controller.textureId_ : null;
+      if (controller.textureId_ > 0) {
+        mControllerMap[controller.textureId_] = controller;
+        return controller.textureId_;
+      }
+      return null;
     } else if (dataSource.sourceType == DataSourceType.network) {
       var controller =
           WinVideoPlayerController.network(dataSource.uri!, isBridgeMode: true);
       await controller.initialize();
-      return controller.textureId_ > 0 ? controller.textureId_ : null;
+      if (controller.textureId_ > 0) {
+        mControllerMap[controller.textureId_] = controller;
+        return controller.textureId_;
+      }
     } else {
       throw UnimplementedError(
           'create() has not been implemented for dataSource type [assets] and [contentUri] in Windows OS');
