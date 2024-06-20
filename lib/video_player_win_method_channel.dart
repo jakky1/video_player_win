@@ -56,18 +56,19 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
     int width = arguments["videoWidth"];
     int height = arguments["videoHeight"];
     double volume = arguments["volume"];
+    int textureId = arguments["textureId"];
     var value = WinVideoPlayerValue(
+      textureId: textureId,
       position: Duration.zero,
       duration: Duration(milliseconds: arguments["duration"]),
       size: Size(width.toDouble(), height.toDouble()),
       isPlaying: false,
-      hasError: false,
       isInitialized: true,
       volume: volume,
     );
 
-    value.textureId = arguments["textureId"];
-    playerMap[value.textureId] = WeakReference<WinVideoPlayerController>(player);
+    playerMap[value.textureId] =
+        WeakReference<WinVideoPlayerController>(player);
     return value;
   }
 

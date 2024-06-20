@@ -4,14 +4,15 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 import 'video_player_win_platform_interface.dart';
 
 enum WinDataSourceType { asset, network, file, contentUri }
 
+@immutable
 class WinVideoPlayerValue {
   final Duration duration;
-  final bool hasError;
   final bool isBuffering;
   final bool isInitialized;
   final bool isLooping;
@@ -22,13 +23,16 @@ class WinVideoPlayerValue {
   final Size size;
   final double volume;
 
-  int textureId = -1; //for internal use only
+  final String? errorDescription;
+  bool get hasError => errorDescription != null;
+
+  final int textureId; //for internal use only
 
   double get aspectRatio => size.isEmpty ? 1 : size.width / size.height;
 
-  WinVideoPlayerValue({
+  const WinVideoPlayerValue({
+    this.textureId = -1,
     this.duration = Duration.zero,
-    this.hasError = false,
     this.size = Size.zero,
     this.position = Duration.zero,
     //Caption caption = Caption.none,
@@ -42,12 +46,12 @@ class WinVideoPlayerValue {
     this.volume = 1.0,
     this.playbackSpeed = 1.0,
     //int rotationCorrection = 0,
-    //String? errorDescription
+    this.errorDescription,
   });
 
   WinVideoPlayerValue copyWith({
+    int? textureId,
     Duration? duration,
-    bool? hasError,
     bool? isBuffering,
     bool? isInitialized,
     bool? isLooping,
@@ -57,10 +61,11 @@ class WinVideoPlayerValue {
     Duration? position,
     Size? size,
     double? volume,
+    String? errorDescription,
   }) {
     return WinVideoPlayerValue(
+      textureId: textureId ?? this.textureId,
       duration: duration ?? this.duration,
-      hasError: hasError ?? this.hasError,
       isBuffering: isBuffering ?? this.isBuffering,
       isInitialized: isInitialized ?? this.isInitialized,
       isLooping: isLooping ?? this.isLooping,
@@ -70,6 +75,7 @@ class WinVideoPlayerValue {
       position: position ?? this.position,
       size: size ?? this.size,
       volume: volume ?? this.volume,
+      errorDescription: errorDescription ?? this.errorDescription,
     );
   }
 }
@@ -133,11 +139,10 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     _positionTimer?.cancel();
     _positionTimer =
         Timer.periodic(const Duration(milliseconds: 300), (Timer timer) async {
-
-      if (!value.isInitialized
-          || !value.isPlaying
-          || value.isCompleted
-          || value.hasError) {
+      if (!value.isInitialized ||
+          !value.isPlaying ||
+          value.isCompleted ||
+          value.hasError) {
         timer.cancel();
         return;
       }
@@ -198,7 +203,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
       case 7: // MEError
         log("[video_player_win] playback event: error");
         value = value.copyWith(
-            isInitialized: false, hasError: true, isPlaying: false);
+            isInitialized: false, isPlaying: false, duration: Duration.zero, errorDescription: "N/A");
+        _eventStreamController.addError(PlatformException(code: "decode failed"));
         _cancelTrackingPosition();
         break;
     }
@@ -209,7 +215,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         .openVideo(this, textureId_, dataSource);
     if (pv == null) {
       log("[video_player_win] controller intialize (open video) failed");
-      value = value.copyWith(hasError: true, isInitialized: false);
+      value = value.copyWith(isInitialized: false, errorDescription: "open file failed");
       _eventStreamController.add(VideoEvent(
           eventType: VideoEventType.initialized, duration: null, size: null));
       return;
@@ -281,7 +287,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     _cancelTrackingPosition();
 
     textureId_ = -1;
-    value.textureId = -1;
+    value = value.copyWith(textureId: -1);
     super.dispose();
 
     log("flutter: video player dispose: id=$textureId_");
