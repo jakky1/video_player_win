@@ -1,3 +1,8 @@
+## 2.3.8
+
+* Fix: unexpected dispose controller when VideoPlayer created without use it, even if it is still referenced.
+* Fix: should set value.isInitialized to false while decode error
+
 ## 2.3.7
 
 * Fix: crash when open wrong file path or url.
