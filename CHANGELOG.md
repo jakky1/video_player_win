@@ -1,3 +1,7 @@
+## 2.3.9
+
+* Fix exception
+
 ## 2.3.8
 
 * Fix: unexpected dispose controller when VideoPlayer created without use it, even if it is still referenced.
