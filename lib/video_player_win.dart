@@ -204,7 +204,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         log("[video_player_win] playback event: error");
         value = value.copyWith(
             isInitialized: false, isPlaying: false, duration: Duration.zero, errorDescription: "N/A");
-        _eventStreamController.addError(PlatformException(code: "decode failed"));
+        var exp = PlatformException(code: "decode failed", message: "N/A");
+        _eventStreamController.addError(exp);
         _cancelTrackingPosition();
         break;
     }
