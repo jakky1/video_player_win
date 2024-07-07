@@ -349,6 +349,7 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
             m_topoSet = true;
             m_reopenFunc = NULL;
         } else if (meType == MESessionPaused) {
+            /*
             // workaround: something wrong with topology, re-open now
             std::cout << "[video_player_win] load fail, reload now" << std::endl;
             Shutdown();
@@ -359,6 +360,7 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
                 }
             });
             return S_OK;
+            */
         }
     }
 
