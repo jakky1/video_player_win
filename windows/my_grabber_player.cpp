@@ -349,6 +349,7 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
             m_topoSet = true;
             m_reopenFunc = NULL;
         } else if (meType == MESessionPaused) {
+            std::cout << "[video_player_win] load fail, but not auto reload" << std::endl;
             /*
             // workaround: something wrong with topology, re-open now
             std::cout << "[video_player_win] load fail, reload now" << std::endl;
