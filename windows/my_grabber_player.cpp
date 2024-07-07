@@ -185,6 +185,7 @@ HRESULT MyPlayer::Play(LONGLONG ms)
 
     PROPVARIANT var;
     PropVariantInit(&var);
+    std::cout << "session pause 1" << std::endl;
     m_pSession->Pause(); //workaround: prevent video freeze when call Play() twice
     return m_pSession->Start(NULL, &var);
 }
@@ -193,6 +194,7 @@ HRESULT MyPlayer::Pause()
 {
     if (m_pSession == NULL) return E_FAIL;
     m_isUserAskPlaying = false;
+    std::cout << "session pause 2" << std::endl;
     return m_pSession->Pause();
 }
 
@@ -230,7 +232,10 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
     // if seek in pause state, mute the volume
     if (!m_isUserAskPlaying) doSetVolume(0.0f);
     HRESULT hr = m_pSession->Start(NULL, &var);
-    if (!m_isUserAskPlaying) m_pSession->Pause();
+    if (!m_isUserAskPlaying) {
+        std::cout << "session pause 3" << std::endl;
+        m_pSession->Pause();
+    }
 
     m_lastPosition = ms * 10000;
     return hr;
@@ -342,6 +347,7 @@ HRESULT MyPlayer::Invoke(IMFAsyncResult* pResult)
             if (!m_isUserAskPlaying) {
                 // workaround: show the first frame when video loaded and Play() not called
                 Play();
+                std::cout << "session pause 4" << std::endl;
                 Pause();
             } else {
                 Play();
