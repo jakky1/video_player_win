@@ -1,3 +1,7 @@
+## 2.3.10
+
+* remove black background in WinVideoPlayerWidget
+
 ## 2.3.9
 
 * Fix exception
