@@ -1,6 +1,7 @@
 ## 2.3.10
 
-* remove black background in WinVideoPlayerWidget
+* destroy all old players when hot-restart in debug mode.
+* remove black background in WinVideoPlayerWidget.
 
 ## 2.3.9
 
