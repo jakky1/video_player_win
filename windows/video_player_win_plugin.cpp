@@ -327,6 +327,17 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 
+  if (method_call.method_name().compare("clearAll") == 0) {
+    // called when hot-restart in debug mode, and clear all the old players which created before hot-restart
+    for(auto iter = playerMap.begin(); iter != playerMap.end(); iter++) {
+      std::cout << "[video_player_win] old player found, deleting" << std::endl;
+      delete iter->second;
+    }
+    playerMap.clear();
+    result->Success();
+    return;
+  }
+
   //std::cout << "HandleMethodCall: " << method_call.method_name() << std::endl;
   flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
 

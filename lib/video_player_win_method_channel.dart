@@ -16,6 +16,12 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
   final playerMap = <int, WeakReference<WinVideoPlayerController>>{};
 
   MethodChannelVideoPlayerWin() {
+    assert(() {
+      // When hot-reload in debugging mode, clear all old players created before hot-reload
+      methodChannel.invokeMethod<void>('clearAll');
+      return true;
+    }());
+
     methodChannel.setMethodCallHandler((call) async {
       //log("[videoplayer] native->flutter: $call");
       int? textureId = call.arguments["textureId"];
