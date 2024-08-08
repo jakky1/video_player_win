@@ -203,7 +203,10 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
       case 7: // MEError
         log("[video_player_win] playback event: error");
         value = value.copyWith(
-            isInitialized: false, isPlaying: false, duration: Duration.zero, errorDescription: "N/A");
+            isInitialized: false,
+            isPlaying: false,
+            duration: Duration.zero,
+            errorDescription: "N/A");
         var exp = PlatformException(code: "decode failed", message: "N/A");
         _eventStreamController.addError(exp);
         _cancelTrackingPosition();
@@ -216,7 +219,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
         .openVideo(this, textureId_, dataSource);
     if (pv == null) {
       log("[video_player_win] controller intialize (open video) failed");
-      value = value.copyWith(isInitialized: false, errorDescription: "open file failed");
+      value = value.copyWith(
+          isInitialized: false, errorDescription: "open file failed");
       _eventStreamController.add(VideoEvent(
           eventType: VideoEventType.initialized, duration: null, size: null));
       return;
@@ -295,40 +299,22 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   }
 }
 
-class WinVideoPlayer extends StatefulWidget {
+class WinVideoPlayer extends StatelessWidget {
   final WinVideoPlayerController controller;
   final FilterQuality filterQuality;
 
-  // ignore: unused_element
   const WinVideoPlayer(this.controller,
       {Key? key, this.filterQuality = FilterQuality.low})
       : super(key: key);
 
   @override
-  State<StatefulWidget> createState() => _WinVideoPlayerState();
-}
-
-class _WinVideoPlayerState extends State<WinVideoPlayer> {
-  @override
-  void didUpdateWidget(WinVideoPlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (widget.controller != oldWidget.controller) {
-      setState(() {});
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: widget.controller.value.aspectRatio,
-          child: Texture(
-            textureId: widget.controller.textureId_,
-            filterQuality: widget.filterQuality,
-          ),
+    return Center(
+      child: AspectRatio(
+        aspectRatio: controller.value.aspectRatio,
+        child: Texture(
+          textureId: controller.textureId_,
+          filterQuality: filterQuality,
         ),
       ),
     );
