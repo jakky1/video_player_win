@@ -1,3 +1,7 @@
+## 2.3.11
+
+* Fix @41: can't play video if no audio out device
+
 ## 2.3.10
 
 * destroy all old players when hot-restart in debug mode.
