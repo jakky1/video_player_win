@@ -534,7 +534,7 @@ HRESULT MyPlayer::CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActi
             CHECK_HR(hr = pHandler->GetCurrentMediaType(&pVideoMediaType));
             MFGetAttributeSize(pVideoMediaType.get(), MF_MT_FRAME_SIZE, &m_VideoWidth, &m_VideoHeight);
         }
-        else if (majorType == MFMediaType_Audio && fSelected)
+        else if (majorType == MFMediaType_Audio && fSelected && hasAudioOutputDevice())
         {
             //Jacky
             if (!isSourceAdded)
@@ -559,4 +559,31 @@ HRESULT MyPlayer::CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActi
 
 done:
     return hr;
+}
+
+bool MyPlayer::hasAudioOutputDevice()
+{
+  HRESULT hr = S_OK;
+  wil::com_ptr<IMMDeviceEnumerator> pEnum;      // Audio device enumerator.
+  wil::com_ptr<IMMDeviceCollection> pDevices;   // Audio device collection.
+  UINT deviceCount = 0;
+
+  // Create the device enumerator.
+  hr = CoCreateInstance(
+    __uuidof(MMDeviceEnumerator),
+    NULL,
+    CLSCTX_ALL,
+    __uuidof(IMMDeviceEnumerator),
+    (void**)&pEnum
+  );
+
+  // Enumerate the rendering devices.
+  hr = pEnum->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pDevices);
+  CHECK_HR(hr);
+
+  hr = pDevices->GetCount(&deviceCount);
+  CHECK_HR(hr);
+
+done:
+  return deviceCount > 0;
 }

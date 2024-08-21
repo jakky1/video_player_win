@@ -75,6 +75,7 @@ private:
 	HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActivate, IMFTopology** ppTopo);
 	void cancelAsyncLoad();
 	HRESULT doSetVolume(float fVol);
+	bool hasAudioOutputDevice();
 
 	wil::com_ptr<IMFMediaSession> m_pSession;
 	wil::com_ptr<IMFMediaSource> m_pMediaSource;
