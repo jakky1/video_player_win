@@ -1,3 +1,9 @@
+## 3.0.0
+
+* Re-implemented by IMFMediaEngine API of Windows Media Foundation.
+* Support .m3u8 now
+* Support video scrubbing
+
 ## 2.3.11
 
 * Fix @41: can't play video if no audio out device
