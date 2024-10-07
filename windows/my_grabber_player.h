@@ -1,34 +1,27 @@
 #pragma once
 
 #include <windows.h>
-#include <mfidl.h>
 #include <mfapi.h>
-#include <audiopolicy.h>
+#include <mfmediaengine.h>
+#include <dxgi1_2.h>
+#include <d3d11.h>
+
+#include <iostream>
 #include <functional>
 #include <mutex>
 
 #include <wil/com.h>
 
-#include "DX11VideoRenderer/DX11VideoRenderer.h"
-
 class MyPlayerCallback : public IUnknown
 {
 public:
-#ifdef WIN32
 	virtual void OnProcessFrame(ID3D11Texture2D* texture) = 0;
-#else
-	virtual void OnProcessSample(REFGUID guidMajorMediaType, DWORD dwSampleFlags,
-		LONGLONG llSampleTime, LONGLONG llSampleDuration, const BYTE* pSampleBuffer,
-		DWORD dwSampleSize) = 0;
-#endif
 };
 
-class MyPlayer : public IMFAsyncCallback
+class MyPlayer : public IMFMediaEngineNotify
 {
 public:
-	inline STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
-		return S_OK;
-	}
+	STDMETHODIMP QueryInterface(REFIID riid, void** ppv);
 	inline STDMETHODIMP_(ULONG) AddRef() {
 		return InterlockedIncrement(&m_cRef);
 	}
@@ -56,47 +49,45 @@ public:
 	HRESULT GetVolume(float* pVol);
 	HRESULT SetVolume(float vol);
 
-	MyPlayer();
+	MyPlayer(IDXGIAdapter* adapter);
 	virtual ~MyPlayer();
 
-protected:
-	// IMFAsyncCallback implemetation
-	HRESULT GetParameters(DWORD* pdwFlags, DWORD* pdwQueue);
-	HRESULT Invoke(IMFAsyncResult* pResult);
-	virtual void OnPlayerEvent(MediaEventType event) {};
-	HRESULT CreateMediaSourceAsync(PCWSTR pszURL, std::function<void(IMFMediaSource* pSource)> callback);
+	void priv__videoThreadFunc();
 
-	std::mutex m_mutex;
-	UINT32 m_VideoWidth;
-	UINT32 m_VideoHeight;
+protected:
+	virtual void OnPlayerEvent(DWORD event) {};
+
+	DWORD m_VideoWidth;
+	DWORD m_VideoHeight;
 
 private:
-	HRESULT initAudioVolume();
-	HRESULT CreateTopology(IMFMediaSource* pSource, IMFActivate* pSinkActivate, IMFTopology** ppTopo);
-	void cancelAsyncLoad();
-	HRESULT doSetVolume(float fVol);
-	bool hasAudioOutputDevice();
+    wil::com_ptr<ID3D11Device> pDX11Device;
+	HRESULT initD3D11();
+	HRESULT initTexture();
+	HRESULT EventNotify(DWORD meEvent, DWORD_PTR param1, DWORD param2);
+	HRESULT startVideoThread();
+	LONGLONG updateFrame();
+	void printErrorMessage(DWORD_PTR param1);
 
-	wil::com_ptr<IMFMediaSession> m_pSession;
-	wil::com_ptr<IMFMediaSource> m_pMediaSource;
-	wil::com_ptr<IMFActivate> m_pVideoTransformActivate;
-	wil::com_ptr<IMFActivate> m_pVideoSinkActivate;
-	wil::com_ptr<IMFActivate> m_pAudioRendererActivate;
-	wil::com_ptr<IMFAudioStreamVolume> m_pAudioVolume;
-	wil::com_ptr<IMFPresentationClock> m_pClock;
-	wil::com_ptr<IMFRateControl> m_pRate;
-	wil::com_ptr<IMFSourceResolver> m_pSourceResolver;
-	wil::com_ptr<IUnknown> m_pSourceResolverCancelCookie;
-	MFTIME m_hnsDuration;
+	wil::com_ptr<MyPlayerCallback> m_frameCallback;
+	std::function<void(bool)> m_loadCallback;
+
+    wil::com_ptr<IMFDXGIDeviceManager> m_pDXGIManager;
+	wil::com_ptr<IDXGIAdapter> m_adapter;
+    wil::com_ptr<IMFMediaEngine> m_pEngine;
+    wil::com_ptr<IMFMediaEngineEx> m_pEngineEx;
+	wil::com_ptr<ID3D11Texture2D> m_pTexture;
+
+	std::mutex m_mutex;
+	bool m_hasVideo = false;
+	LONGLONG m_maxFrameInterval = 10;
+
+	BOOL m_isPlaying = FALSE;
+	HANDLE m_playingEvent = NULL; // win32 event
+	LONGLONG m_seekingToPts = -1; // seeking pts if seeking
 	bool m_isShutdown;
-	HWND m_ChildWnd;
 
-	float m_vol;
-	bool m_isUserAskPlaying;
-	LONGLONG m_lastPosition = 0;
-
-	// save parameters in OpenURL(), used to re-open when open failed
-	bool m_topoSet = false; // is topology set succesfully
-	std::function<void(std::function<void(bool)>)> m_reopenFunc;
-	//
+    MFVideoNormalizedRect m_frameRectSrc = {};
+    RECT m_frameRectDst = {};
+	HANDLE m_threadHandle = NULL;
 };

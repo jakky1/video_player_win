@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "my_grabber_player.h"
+#include <dxgi.h>
 #include <mfapi.h>
 #include <Shlwapi.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@
 
 // Jacky {
 flutter::PluginRegistrarWindows *g_registrar; // Jacky
+IDXGIAdapter* g_dxgiAdapter; //Jacky
 
 #include <stack>
 #include <set>
@@ -104,7 +106,7 @@ public:
   FlutterDesktopGpuSurfaceDescriptor texture_buffer;
   HWND mChildHWND = 0;
 
-  MyPlayerInternal() {}
+  MyPlayerInternal(IDXGIAdapter* adapter) : MyPlayer(adapter) {}
   ~MyPlayerInternal() {
     keepScreenOn(false);
     textureId = -1;
@@ -134,37 +136,35 @@ private:
     m_screenOnKeeper.enable(keepOn);
   }
 
-  void OnPlayerEvent(MediaEventType event) override
+  void OnPlayerEvent(DWORD event) override
   {
     switch (event) {
-      case MEBufferingStarted:
+      case MF_MEDIA_ENGINE_EVENT_BUFFERINGSTARTED:
         mPlaybackState = BUFFERING_START;
         break;
-      case MEBufferingStopped:
+      case MF_MEDIA_ENGINE_EVENT_BUFFERINGENDED:
         mPlaybackState = BUFFERING_END;
         break;
-      case MESessionStarted:
+      case MF_MEDIA_ENGINE_EVENT_PLAY:
         mPlaybackState = START;
         keepScreenOn(true);
         break;
-      case MESessionPaused:
+      case MF_MEDIA_ENGINE_EVENT_PAUSE:
         mPlaybackState = PAUSE;
         keepScreenOn(false);
         break;
-      case MESessionStopped:
-        mPlaybackState = STOP;
+      case MF_MEDIA_ENGINE_EVENT_ENDED:
+        mPlaybackState = END;
         keepScreenOn(false);
         break;
       case MESessionClosed:
         mPlaybackState = IDLE;
         keepScreenOn(false);
         break;
-      case MESessionEnded:
-        mPlaybackState = END;
-        keepScreenOn(false);
-        break;
-      case MEError:
+      case MF_MEDIA_ENGINE_EVENT_ABORT:
+      case MF_MEDIA_ENGINE_EVENT_ERROR:
         mPlaybackState = SESSION_ERROR;
+        keepScreenOn(false);
         break;
       default:
         return;
@@ -173,7 +173,11 @@ private:
     HWND hwnd = g_registrar->GetView()->GetNativeWindow();
     if (hwnd != NULL && IsWindow(hwnd))
     {
-      PostMessage(GetParent(hwnd), WM_FLUTTER_TASK, textureId, mPlaybackState);
+      // when session closed, player already destroyed, so don't notify flutter
+      if (mPlaybackState != IDLE) 
+      {
+        PostMessage(GetParent(hwnd), WM_FLUTTER_TASK, textureId, mPlaybackState);
+      }
     }
     else
     {
@@ -239,7 +243,7 @@ MyPlayerInternal* getPlayerById(int64_t textureId, bool autoCreate = false) {
       MFStartup(MF_VERSION); //TODO: hint user if startup failed... if it is possible?
       isMFInited = true;
     }
-    data = new MyPlayerInternal();
+    data = new MyPlayerInternal(g_dxgiAdapter);
     createTexture(data);
     playerMap[data->textureId] = data;
   }
@@ -256,10 +260,9 @@ void destroyPlayerById(int64_t textureId, bool toRelease) {
     data->textureId = -1;
   }
 
+  data->Shutdown();
   if (toRelease) {
     data->Release();
-  } else {
-    data->Shutdown();
   }
   //std::cout << "native destroy player id: " << textureId << std::endl;
 }
@@ -286,6 +289,7 @@ void VideoPlayerWinPlugin::RegisterWithRegistrar(
 
   registrar->AddPlugin(std::move(plugin));
 
+  g_dxgiAdapter = registrar->GetView()->GetGraphicsAdapter(); //Jacky
   texture_registar_ = registrar->texture_registrar(); //Jacky
   gMethodChannel = new flutter::MethodChannel<flutter::EncodableValue>(registrar->messenger(), "video_player_win",
           &flutter::StandardMethodCodec::GetInstance()); //Jacky
@@ -330,8 +334,10 @@ void VideoPlayerWinPlugin::HandleMethodCall(
   if (method_call.method_name().compare("clearAll") == 0) {
     // called when hot-restart in debug mode, and clear all the old players which created before hot-restart
     for(auto iter = playerMap.begin(); iter != playerMap.end(); iter++) {
-      std::cout << "[video_player_win] old player found, deleting" << std::endl;
-      delete iter->second;
+      if (iter->first < 0) continue;
+      std::cout << "[video_player_win] old player found, deleting " << iter->first << std::endl;
+      iter->second->Shutdown();
+      iter->second->Release();
     }
     playerMap.clear();
     result->Success();
@@ -389,7 +395,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
         shared_result->Success(flutter::EncodableValue(map));
       } else {
         // TODO: call destroyPlayerById(true) when open video failed here will crash since player->Release() called... how to fix?
-        destroyPlayerById(player->textureId, false);
+        destroyPlayerById(player->textureId, true);
 
         flutter::EncodableMap map;
         map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
