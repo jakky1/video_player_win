@@ -23,7 +23,7 @@ Features:
 
 - GPU hardware acceleration, low CPU usage *(maybe support 4K 60fps video?)*
 - No GPL / LGPL 3rd-party libraries inside.
-- Only one dll file (~180 KB) added as a plugin.
+- Only one dll file (~130 KB) added as a plugin.
 - Support Windows / Android / iOS / Web by collaboration with [video_player][1]
 
 Limitations:
