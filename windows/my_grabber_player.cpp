@@ -9,9 +9,11 @@
 #pragma comment(lib, "D3D11")
 #pragma comment(lib, "mfplat")
 
-#define CHECK_HR(x) if (FAILED(x)) { goto done; }
 #define NO_FRAME -2
 #define TAG "[video_player_win][native] "
+
+#define CHECK_HR(x) if (FAILED(x)) { goto done; }
+//#define CHECK_HR(x) if (FAILED(x)) { std::cout << TAG "CHECK_HR() failed: hr=" << hr << ", at " << __FUNCTION__ << "():" << __LINE__ << std::endl; goto done; } // debug
 
 // --------------------------------------------------------------------------
 
