@@ -219,6 +219,9 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
 
     if (m_isShutdown || m_pEngine) return E_ABORT;
 
+    m_frameCallback = playerCallback;
+    m_loadCallback = loadCallback;
+
     CHECK_HR(hr = initD3D11());
     CHECK_HR(hr = CoCreateInstance(CLSID_MFMediaEngineClassFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFactory)));
 
@@ -230,18 +233,12 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
     
     CHECK_HR(hr = m_pEngine->QueryInterface(IID_PPV_ARGS(&m_pEngineEx)));
 
-    BSTR sourceBSTR;
-	sourceBSTR = SysAllocString(pszFileName);
-	hr = m_pEngine->SetSource(sourceBSTR);
-	SysFreeString(sourceBSTR);
-    CHECK_HR(hr);
-
-    m_frameCallback = playerCallback;
-    m_loadCallback = loadCallback;
+	CHECK_HR(hr = m_pEngine->SetSource((BSTR)pszFileName));
 
 done:
     if (FAILED(hr)) 
     {
+        std::cout << TAG "OpenURL() failed: hr=" << hr << std::endl;
         m_loadCallback(SUCCEEDED(hr));
         m_loadCallback = NULL;
     }
