@@ -1,3 +1,7 @@
+## 3.1.0
+
+* Fix crash issue if Windows not support DirectX 12.
+
 ## 3.0.0
 
 * Re-implemented by IMFMediaEngine API of Windows Media Foundation.
