@@ -1,3 +1,7 @@
+## 3.1.1
+
+* Fix #44: Fix setLooping(true) will auto play without video frames when play ended
+
 ## 3.1.0
 
 * Fix crash issue if Windows not support DirectX 12.
