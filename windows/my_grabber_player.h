@@ -83,6 +83,7 @@ private:
 	LONGLONG m_maxFrameInterval = 10;
 
 	BOOL m_isPlaying = FALSE;
+	BOOL m_isEnded = FALSE;
 	HANDLE m_playingEvent = NULL; // win32 event
 	LONGLONG m_seekingToPts = -1; // seeking pts if seeking
 	bool m_isShutdown;

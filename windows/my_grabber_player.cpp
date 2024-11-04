@@ -143,10 +143,12 @@ HRESULT MyPlayer::EventNotify(DWORD event, DWORD_PTR param1, DWORD param2)
         case MF_MEDIA_ENGINE_EVENT_PLAY:
         case MF_MEDIA_ENGINE_EVENT_PLAYING:
             m_isPlaying = TRUE;
+            m_isEnded = FALSE;
             SetEvent(m_playingEvent);
             break;
-        case MF_MEDIA_ENGINE_EVENT_PAUSE:
         case MF_MEDIA_ENGINE_EVENT_ENDED:
+            m_isEnded = TRUE;
+        case MF_MEDIA_ENGINE_EVENT_PAUSE:
             ResetEvent(m_playingEvent);
             m_isPlaying = FALSE;
             break;
@@ -391,6 +393,7 @@ LONGLONG MyPlayer::GetCurrentPosition()
 
 HRESULT MyPlayer::Seek(LONGLONG ms)
 {
+    HRESULT hr;
     if (!m_pEngine) return E_FAIL;
 
     if (!m_isPlaying) 
@@ -400,7 +403,9 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
         SetEvent(m_playingEvent);
     }
     //return m_pEngine->SetCurrentTime((double)ms / 1000);
-    return m_pEngineEx->SetCurrentTimeEx((double)ms / 1000, MF_MEDIA_ENGINE_SEEK_MODE_APPROXIMATE );
+    hr = m_pEngineEx->SetCurrentTimeEx((double)ms / 1000, MF_MEDIA_ENGINE_SEEK_MODE_APPROXIMATE );
+    if (SUCCEEDED(hr) && m_isEnded) Play(); // Fix issue#44: seek() after ended, will play audio without video frames...
+    return hr;
 }
 
 SIZE MyPlayer::GetVideoSize()
