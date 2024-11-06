@@ -393,7 +393,6 @@ LONGLONG MyPlayer::GetCurrentPosition()
 
 HRESULT MyPlayer::Seek(LONGLONG ms)
 {
-    HRESULT hr;
     if (!m_pEngine) return E_FAIL;
 
     if (!m_isPlaying) 
@@ -403,9 +402,8 @@ HRESULT MyPlayer::Seek(LONGLONG ms)
         SetEvent(m_playingEvent);
     }
     //return m_pEngine->SetCurrentTime((double)ms / 1000);
-    hr = m_pEngineEx->SetCurrentTimeEx((double)ms / 1000, MF_MEDIA_ENGINE_SEEK_MODE_APPROXIMATE );
-    if (SUCCEEDED(hr) && m_isEnded) Play(); // Fix issue#44: seek() after ended, will play audio without video frames...
-    return hr;
+    if (m_isEnded) Play(); // Fix issue#44: seek() after ended, will play audio without video frames...
+    return m_pEngineEx->SetCurrentTimeEx((double)ms / 1000, MF_MEDIA_ENGINE_SEEK_MODE_APPROXIMATE );
 }
 
 SIZE MyPlayer::GetVideoSize()
