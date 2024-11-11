@@ -34,7 +34,7 @@ private:
 	long m_cRef = 1;
 
 public:
-	HRESULT OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback);
+	HRESULT OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::vector<std::wstring> httpHeaders, std::function<void(bool)> loadCallback);
 	HRESULT Play(LONGLONG ms = -1);
 	HRESULT Pause();
 	void Shutdown();

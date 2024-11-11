@@ -1,4 +1,5 @@
 #include "my_grabber_player.h"
+#include "my_http_bytestream.h"
 
 #include <windows.h>
 
@@ -211,9 +212,10 @@ void MyPlayer::printErrorMessage(DWORD_PTR param1)
     std::cout << TAG "player error occurs (MF_MEDIA_ENGINE_EVENT_ERROR) : " << msg << std::endl;
 }
 
-HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::function<void(bool)> loadCallback)
+HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCallback, HWND hwndVideo, std::vector<std::wstring> httpHeaders, std::function<void(bool)> loadCallback)
 {
     HRESULT hr;
+    wil::com_ptr<MyHttpByteStream> pStream;
     wil::com_ptr<IMFMediaEngineClassFactory> pFactory; // TODO: keep as static member ?
     wil::com_ptr<IMFAttributes> pAttributes;    
 
@@ -233,7 +235,12 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
     
     CHECK_HR(hr = m_pEngine->QueryInterface(IID_PPV_ARGS(&m_pEngineEx)));
 
-	CHECK_HR(hr = m_pEngine->SetSource((BSTR)pszFileName));
+    if (!httpHeaders.empty() && wcsncmp(pszFileName, L"http", 4) == 0) {
+        pStream = new MyHttpByteStream(std::wstring(pszFileName), httpHeaders);
+        CHECK_HR(hr = m_pEngineEx->SetSourceFromByteStream(pStream.get(), (BSTR)pszFileName));
+    } else {
+      CHECK_HR(hr = m_pEngine->SetSource((BSTR)pszFileName));  
+    }
 
 done:
     if (FAILED(hr)) 

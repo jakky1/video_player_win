@@ -33,10 +33,12 @@ abstract class VideoPlayerWinPlatform extends PlatformInterface {
   }
 
   WinVideoPlayerController? getPlayerByTextureId(int textureId) {
-    throw UnimplementedError('getPlayerByTextureId() has not been implemented.');
+    throw UnimplementedError(
+        'getPlayerByTextureId() has not been implemented.');
   }
 
-  Future<WinVideoPlayerValue?> openVideo(WinVideoPlayerController player, int textureId, String path) {
+  Future<WinVideoPlayerValue?> openVideo(WinVideoPlayerController player,
+      int textureId, String path, Map<String, String> httpHeaders) {
     throw UnimplementedError('openVideo() has not been implemented.');
   }
 

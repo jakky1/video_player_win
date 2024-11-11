@@ -53,8 +53,8 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
       }
       return null;
     } else if (dataSource.sourceType == DataSourceType.network) {
-      var controller =
-          WinVideoPlayerController.network(dataSource.uri!, isBridgeMode: true);
+      var controller = WinVideoPlayerController.network(dataSource.uri!,
+          isBridgeMode: true, httpHeaders: dataSource.httpHeaders);
       await controller.initialize();
       if (controller.textureId_ > 0) {
         mControllerMap[controller.textureId_] = controller;

@@ -84,6 +84,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   late final bool _isBridgeMode; // true if used by 'video_player' package
   int textureId_ = -1;
   final String dataSource;
+  final Map<String, String> httpHeaders;
   late final WinDataSourceType dataSourceType;
   bool _isLooping = false;
 
@@ -98,7 +99,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   }
 
   WinVideoPlayerController._(this.dataSource, this.dataSourceType,
-      {bool isBridgeMode = false})
+      {bool isBridgeMode = false, this.httpHeaders = const {}})
       : super(WinVideoPlayerValue()) {
     if (dataSourceType == WinDataSourceType.contentUri) {
       throw UnsupportedError(
@@ -120,10 +121,15 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
   WinVideoPlayerController.file(File file, {bool isBridgeMode = false})
       : this._(file.path, WinDataSourceType.file, isBridgeMode: isBridgeMode);
+  @Deprecated('Use WinVideoPlayerController.networkUrl instead')
   WinVideoPlayerController.network(String dataSource,
-      {bool isBridgeMode = false})
+      {bool isBridgeMode = false, Map<String, String> httpHeaders = const {}})
       : this._(dataSource, WinDataSourceType.network,
-            isBridgeMode: isBridgeMode);
+            isBridgeMode: isBridgeMode, httpHeaders: httpHeaders);
+  WinVideoPlayerController.networkUrl(Uri url,
+      {bool isBridgeMode = false, Map<String, String> httpHeaders = const {}})
+      : this._(url.toString(), WinDataSourceType.network,
+            isBridgeMode: isBridgeMode, httpHeaders: httpHeaders);
   WinVideoPlayerController.asset(String dataSource, {String? package})
       : this._(dataSource, WinDataSourceType.asset);
   WinVideoPlayerController.contentUri(Uri contentUri)
@@ -216,7 +222,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
   Future<void> initialize() async {
     WinVideoPlayerValue? pv = await VideoPlayerWinPlatform.instance
-        .openVideo(this, textureId_, dataSource);
+        .openVideo(this, textureId_, dataSource, httpHeaders);
     if (pv == null) {
       log("[video_player_win] controller intialize (open video) failed");
       value = value.copyWith(
