@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+//import 'package:video_player_win/video_player_win.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,12 +18,21 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   VideoPlayerController? controller;
+  final httpHeaders = <String, String>{
+    "User-Agent": "ergerthertherth",
+    "key3": "value3_ccccc"
+  };
 
   void reload() {
     controller?.dispose();
-    controller = VideoPlayerController.file(File("E:\\test_youtube.mp4"));
+    controller = VideoPlayerController.file(File("D:\\test\\test_4k.mp4"));
     //controller = WinVideoPlayerController.file(File("E:\\test_youtube.mp4"));
-    //controller = VideoPlayerController.networkUrl(Uri.parse("https://media.w3.org/2010/05/sintel/trailer.mp4"));
+    //controller = VideoPlayerController.networkUrl(Uri.parse("https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8"));
+    /*
+    controller = VideoPlayerController.networkUrl(
+        Uri.parse("https://media.w3.org/2010/05/sintel/trailer.mp4"),
+        httpHeaders: httpHeaders);
+        */
     //controller = WinVideoPlayerController.file(File("E:\\Downloads\\0.FDM\\sample-file-1.flac"));
 
     controller!.initialize().then((value) {
@@ -64,7 +74,7 @@ class _MyAppState extends State<MyApp> {
           title: const Text('video_player_win example app'),
         ),
         body: Stack(children: [
-          VideoPlayer(controller!),
+          Container(color: Colors.black, child: VideoPlayer(controller!)),
           Positioned(
               bottom: 0,
               child: Column(children: [
@@ -76,14 +86,16 @@ class _MyAppState extends State<MyApp> {
                     String timeStr = "$minute:$second";
                     if (value.isCompleted) timeStr = "$timeStr (completed)";
                     return Text(timeStr,
-                        style: Theme.of(context).textTheme.headline6!.copyWith(
-                            color: Colors.white,
-                            backgroundColor: Colors.black54));
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium!
+                            .copyWith(
+                                color: Colors.white,
+                                backgroundColor: Colors.black54));
                   }),
                 ),
                 ElevatedButton(
-                    onPressed: () => reload(),
-                    child: const Text("Reload")),
+                    onPressed: () => reload(), child: const Text("Reload")),
                 ElevatedButton(
                     onPressed: () => controller?.play(),
                     child: const Text("Play")),

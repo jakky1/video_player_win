@@ -73,7 +73,16 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "coroutine": "cpp"
+        "coroutine": "cpp",
+        "future": "cpp",
+        "resumable": "cpp",
+        "deque": "cpp",
+        "queue": "cpp",
+        "stack": "cpp",
+        "ranges": "cpp",
+        "span": "cpp",
+        "fstream": "cpp"
     },
-    "cmake.sourceDirectory": "${workspaceFolder}/windows"
+    "cmake.sourceDirectory": "${workspaceFolder}/windows",
+    "dart.flutterSdkPath": "C:\\flutter"
 }
