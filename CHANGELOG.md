@@ -1,3 +1,7 @@
+## 3.1.2
+
+* Support load from assets.
+
 ## 3.1.1
 
 * Fix #44: Fix setLooping(true) will auto play without video frames when play ended
