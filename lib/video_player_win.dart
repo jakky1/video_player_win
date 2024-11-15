@@ -118,14 +118,21 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     VideoPlayerWinPlatform.instance.dispose(textureId);
   });
 
+  static String getAssetPath(String dataSource) {
+    File file = File(Platform.resolvedExecutable);
+    return "${file.parent.path}\\data\\flutter_assets\\$dataSource";
+  }
+
   WinVideoPlayerController.file(File file, {bool isBridgeMode = false})
       : this._(file.path, WinDataSourceType.file, isBridgeMode: isBridgeMode);
   WinVideoPlayerController.network(String dataSource,
       {bool isBridgeMode = false})
       : this._(dataSource, WinDataSourceType.network,
             isBridgeMode: isBridgeMode);
-  WinVideoPlayerController.asset(String dataSource, {String? package})
-      : this._(dataSource, WinDataSourceType.asset);
+  WinVideoPlayerController.asset(String dataSource,
+      {String? package, bool isBridgeMode = false})
+      : this._(getAssetPath(dataSource), WinDataSourceType.file,
+            isBridgeMode: isBridgeMode);
   WinVideoPlayerController.contentUri(Uri contentUri)
       : this._("", WinDataSourceType.contentUri);
 

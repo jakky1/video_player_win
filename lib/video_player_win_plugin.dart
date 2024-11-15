@@ -31,6 +31,8 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
   /// Creates an instance of a video player and returns its textureId.
   @override
   Future<int?> create(DataSource dataSource) async {
+    WinVideoPlayerController? controller;
+
     if (dataSource.sourceType == DataSourceType.file) {
       // dataSource.uri is url encoded and has a file:// scheme.
       // But if the dataSource.uri original path contains non-ASCII characters,
@@ -44,26 +46,25 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
       // Without the file:// scheme, the IMFSourceResolver API treats the "%"
       // character as a normal string instead of url decoding the path.
       var uri = Uri.parse(dataSource.uri!);
-      var controller = WinVideoPlayerController.file(File(uri.toFilePath()),
+      controller = WinVideoPlayerController.file(File(uri.toFilePath()),
           isBridgeMode: true);
-      await controller.initialize();
-      if (controller.textureId_ > 0) {
-        mControllerMap[controller.textureId_] = controller;
-        return controller.textureId_;
-      }
-      return null;
     } else if (dataSource.sourceType == DataSourceType.network) {
-      var controller =
+      controller =
           WinVideoPlayerController.network(dataSource.uri!, isBridgeMode: true);
-      await controller.initialize();
-      if (controller.textureId_ > 0) {
-        mControllerMap[controller.textureId_] = controller;
-        return controller.textureId_;
-      }
+    } else if (dataSource.sourceType == DataSourceType.asset) {
+      controller =
+          WinVideoPlayerController.asset(dataSource.asset!, isBridgeMode: true);
     } else {
       throw UnimplementedError(
           'create() has not been implemented for dataSource type [assets] and [contentUri] in Windows OS');
     }
+
+    await controller.initialize();
+    if (controller.textureId_ > 0) {
+      mControllerMap[controller.textureId_] = controller;
+      return controller.textureId_;
+    }
+    return null;
   }
 
   /// Returns a Stream of [VideoEventType]s.
