@@ -31,6 +31,16 @@ IDXGIAdapter* g_dxgiAdapter; //Jacky
 #include <chrono>
 flutter::MethodChannel<flutter::EncodableValue>* gMethodChannel = NULL;
 
+std::wstring toWideString(std::string input) {
+    WCHAR wPath[1024*3];
+    auto convResult = MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
+    if (convResult < 0) {
+      std::cout << "[video_player_win] native convert string to utf16 (WCHAR*) failed: path = " << input << std::endl;
+      return L"";
+    }
+    return std::wstring(wPath);
+}
+
 inline uint64_t getCurrentTime() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -361,6 +371,15 @@ void VideoPlayerWinPlugin::HandleMethodCall(
   }
 
   if (isOpenVideo) {
+    std::vector<std::wstring> headerLines;
+    auto httpHeaders = std::get<flutter::EncodableMap>(arguments[flutter::EncodableValue("httpHeaders")]);
+    for (auto it = httpHeaders.begin(); it != httpHeaders.end(); it++) {
+      auto key = std::get<std::string>(it->first);
+      auto value = std::get<std::string>(it->second);
+      auto line = toWideString(key) + L": " + toWideString(value);
+      headerLines.push_back(line);
+    }
+
     auto path = std::get<std::string>(arguments[flutter::EncodableValue("path")]);
     WCHAR wPath[1024];
     auto convResult = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
@@ -371,7 +390,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
     HWND hwnd = GetAncestor(g_registrar->GetView()->GetNativeWindow(), GA_ROOT);
-    HRESULT hr = player->OpenURL(wPath, player, hwnd, [=](bool isSuccess) {
+    HRESULT hr = player->OpenURL(wPath, player, hwnd, headerLines, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = getPlayerById(textureId, false);
         if (_player == NULL) {
