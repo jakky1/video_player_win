@@ -81,7 +81,7 @@ class WinVideoPlayerValue {
 }
 
 class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
-  late final bool _isBridgeMode; // true if used by 'video_player' package
+  late final bool _isPluginMode; // true if used by 'video_player' package
   int textureId_ = -1;
   final String dataSource;
   final Map<String, String> httpHeaders;
@@ -99,8 +99,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   }
 
   WinVideoPlayerController._(this.dataSource, this.dataSourceType,
-      {bool isBridgeMode = false, this.httpHeaders = const {}})
-      : super(WinVideoPlayerValue()) {
+      {bool isPluginMode = false, this.httpHeaders = const {}})
+      : super(const WinVideoPlayerValue()) {
     if (dataSourceType == WinDataSourceType.contentUri) {
       throw UnsupportedError(
           "VideoPlayerController.contentUri() not supported in Windows");
@@ -110,7 +110,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
           "VideoPlayerController.asset() not implement yet.");
     }
 
-    _isBridgeMode = isBridgeMode;
+    _isPluginMode = isPluginMode;
     //VideoPlayerWinPlatform.instance.registerPlayer(_textureId, this);
   }
   static final Finalizer<int> _finalizer = Finalizer((textureId) {
@@ -124,21 +124,21 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     return "${file.parent.path}\\data\\flutter_assets\\$dataSource";
   }
 
-  WinVideoPlayerController.file(File file, {bool isBridgeMode = false})
-      : this._(file.path, WinDataSourceType.file, isBridgeMode: isBridgeMode);
+  WinVideoPlayerController.file(File file, {bool isPluginMode = false})
+      : this._(file.path, WinDataSourceType.file, isPluginMode: isPluginMode);
   @Deprecated('Use WinVideoPlayerController.networkUrl instead')
   WinVideoPlayerController.network(String dataSource,
-      {bool isBridgeMode = false, Map<String, String> httpHeaders = const {}})
+      {bool isPluginMode = false, Map<String, String> httpHeaders = const {}})
       : this._(dataSource, WinDataSourceType.network,
-            isBridgeMode: isBridgeMode, httpHeaders: httpHeaders);
+            isPluginMode: isPluginMode, httpHeaders: httpHeaders);
   WinVideoPlayerController.networkUrl(Uri url,
-      {bool isBridgeMode = false, Map<String, String> httpHeaders = const {}})
+      {bool isPluginMode = false, Map<String, String> httpHeaders = const {}})
       : this._(url.toString(), WinDataSourceType.network,
-            isBridgeMode: isBridgeMode, httpHeaders: httpHeaders);
+            isPluginMode: isPluginMode, httpHeaders: httpHeaders);
   WinVideoPlayerController.asset(String dataSource,
-      {String? package, bool isBridgeMode = false})
+      {String? package, bool isPluginMode = false})
       : this._(getAssetPath(dataSource), WinDataSourceType.file,
-            isBridgeMode: isBridgeMode);
+            isPluginMode: isPluginMode);
   WinVideoPlayerController.contentUri(Uri contentUri)
       : this._("", WinDataSourceType.contentUri);
 
@@ -146,8 +146,8 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
   void _cancelTrackingPosition() => _positionTimer?.cancel();
   void _startTrackingPosition() async {
     // NOTE: 'video_player' package already auto get position periodically,
-    // so do nothing if _isBridgeMode = true
-    if (_isBridgeMode) return;
+    // so do nothing if _isPluginMode = true
+    if (_isPluginMode) return;
 
     _positionTimer?.cancel();
     _positionTimer =
@@ -318,8 +318,7 @@ class WinVideoPlayer extends StatelessWidget {
   final FilterQuality filterQuality;
 
   const WinVideoPlayer(this.controller,
-      {Key? key, this.filterQuality = FilterQuality.low})
-      : super(key: key);
+      {super.key, this.filterQuality = FilterQuality.low});
 
   @override
   Widget build(BuildContext context) {

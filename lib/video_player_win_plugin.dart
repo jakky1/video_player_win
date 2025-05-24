@@ -49,18 +49,18 @@ class WindowsVideoPlayer extends VideoPlayerPlatform {
       var uri = Uri.parse(dataSource.uri!);
       controller = WinVideoPlayerController.file(
         File(uri.toFilePath()),
-        isBridgeMode: true,
+        isPluginMode: true,
       );
     } else if (dataSource.sourceType == DataSourceType.network) {
       controller = WinVideoPlayerController.network(
         dataSource.uri!,
-        isBridgeMode: true,
+        isPluginMode: true,
         httpHeaders: dataSource.httpHeaders,
       );
     } else if (dataSource.sourceType == DataSourceType.asset) {
       controller = WinVideoPlayerController.asset(
         dataSource.asset!,
-        isBridgeMode: true,
+        isPluginMode: true,
       );
     } else {
       throw UnimplementedError(
