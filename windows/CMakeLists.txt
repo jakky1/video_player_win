@@ -60,6 +60,7 @@ add_library(${PLUGIN_NAME} SHARED
   "video_player_win_plugin_c_api.cpp"
   ${PLUGIN_SOURCES}
   "my_grabber_player.cpp" #Jacky
+  "my_http_bytestream.cpp" #Jacky
   ${DX11VideoRenderer_Sources} #Jacky
 )
 
