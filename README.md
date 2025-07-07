@@ -50,7 +50,7 @@ In this case, please install ONE of the following codec pack into your Windows:
 - [Windows 10 Codec Pack][4]
 
 You can auto-install codec by the following Dart code:
-```
+```dart
 import 'dart:io';
 
 Process.run('E:\\K-Lite_Codec_Pack_1730_Basic.exe', ['/silent']).then((value) {
@@ -68,7 +68,7 @@ To play AV1 video,
 - or download the [AV1 codec installer][6] (only 850 KB)
 
 You can silently auto-install codec by the following Dart code:
-```
+```dart
 import 'dart:io';
 
 Process.run('powershell', ['Add-AppxPackage', '-Path', 'E:\\av1-video-extension-1-1-52851-0.appx']).then((value) {
@@ -96,23 +96,12 @@ dependencies:
   video_player_win: ^2.0.0
 ```
 
-Or
-
-```yaml
-dependencies:
-  video_player: ^2.5.1
-  video_player_win:
-    git:
-      url: https://github.com/jakky1/video_player_win.git
-      ref: master
-```
-
 # Usage
 
 ## video / audio playback
 
 Play from network source:
-```
+```dart
 var controller = VideoPlayerController.network("https://www.your-web.com/sample.mp4");
 controller.initialize().then((value) {
   if (controller.value.isInitialized) {
@@ -126,12 +115,12 @@ controller.initialize().then((value) {
 ```
 
 Play from file:
-```
+```dart
 var controller = VideoPlayerController.file(File("E:\\test.mp4"));
 ```
 
 If the file is a video, build a display widget to show video frames:
-```
+```dart
 Widget build(BuildContext context) {
   return VideoPlayer(controller);
 }
@@ -150,7 +139,7 @@ Widget build(BuildContext context) {
 - free resource: ``` controller.dispose(); ```
 
 # Listen playback events and values
-```
+```dart
 void onPlaybackEvent() {
 	final value = controller.value;
 	// value.isInitialized (bool)
@@ -166,8 +155,22 @@ controller.addListener(onPlaybackEvent);
 controller.removeListener(onPlaybackEvent); // remember to removeListener()
 ```
 ## Release resource
-```
+```dart
 controller.dispose();
+```
+
+# Keep aspect ratio of VideoPlayer
+
+```dart
+Widget player = Container(
+  color: Colors.black,
+  child: Center(
+    child: AspectRatio(
+      aspectRatio: controller!.value.aspectRatio,
+      child: VideoPlayer(controller!),
+    ),
+  ),
+);
 ```
 
 # standalone mode
@@ -177,11 +180,11 @@ If your app only runs on Windows, and you want to remove library dependencies as
 ```yaml
 dependencies:
   # video_player: ^2.4.7 # mark this line, for Windows only app
-  video_player_win: ^1.0.1
+  video_player_win:
 ```
 
 and modify all the following class name in your code:
-```
+```dart
 VideoPlayer -> WinVideoPlayer  // add "Win" prefix
 VideoPlayerController -> WinVideoPlayerController  // add "Win" prefix
 ```
@@ -191,7 +194,7 @@ just only modify class names. All the properties / method are the same with [vid
 
 # Example
 
-```
+```dart
 import 'dart:developer';
 import 'dart:io';
 

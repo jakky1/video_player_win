@@ -1,3 +1,9 @@
+## 3.2.0
+
+* support http headers (experimental)
+* BREAKING CHANGE: now `WinVideoPlayer` and `VideoPlayer` DO NOT automatically keep aspect ratio, act as `video_player`.
+* Fix cmake error in cmake v3.31 or later
+
 ## 3.1.2
 
 * Support load from assets.
