@@ -36,11 +36,16 @@ if(NOT NUGET)
   endif()
 endif()
 
-add_custom_target(${PROJECT_NAME}_DEPENDENCIES_DOWNLOAD ALL)
+set(WIL_STAMP_FILE ${CMAKE_BINARY_DIR}/wil_download.stamp)
 add_custom_command(
-  TARGET ${PROJECT_NAME}_DEPENDENCIES_DOWNLOAD PRE_BUILD
+  OUTPUT ${WIL_STAMP_FILE}
   COMMAND ${NUGET} install Microsoft.Windows.ImplementationLibrary -Version ${WIL_VERSION} -ExcludeVersion -OutputDirectory ${CMAKE_BINARY_DIR}/packages
+  COMMAND ${CMAKE_COMMAND} -E touch ${WIL_STAMP_FILE}
   DEPENDS ${NUGET}
+  VERBATIM
+)
+add_custom_target(${PROJECT_NAME}_DEPENDENCIES_DOWNLOAD ALL
+  DEPENDS ${WIL_STAMP_FILE}
 )
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/DX11VideoRenderer")
