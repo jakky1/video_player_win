@@ -322,14 +322,9 @@ class WinVideoPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: AspectRatio(
-        aspectRatio: controller.value.aspectRatio,
-        child: Texture(
-          textureId: controller.textureId_,
-          filterQuality: filterQuality,
-        ),
-      ),
+    return Texture(
+      textureId: controller.textureId_,
+      filterQuality: filterQuality,
     );
   }
 }
