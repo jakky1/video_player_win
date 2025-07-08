@@ -93,7 +93,7 @@ Add this to your package's `pubspec.yaml` file:
 ```yaml
 dependencies:
   video_player: ^2.5.1
-  video_player_win: ^2.0.0
+  video_player_win: ^3.0.0
 ```
 
 # Usage
@@ -128,15 +128,15 @@ Widget build(BuildContext context) {
 
 # operations
 
-- Play: ``` controller.play(); ```
-- Pause: ``` controller.pause(); ```
-- Seek: ``` controller.seekTo( Duration(minute: 10, second:30) ); ```
+- Play: `controller.play();`
+- Pause: `controller.pause();`
+- Seek: `controller.seekTo( Duration(minute: 10, second:30) );`
 - set playback speed: (normal speed: 1.0)
-``` controller.setPlaybackSpeed(1.5); ```
+`controller.setPlaybackSpeed(1.5);`
 - set volume: (max: 1.0 , mute: 0.0)
-``` controller.setVolume(0.5); ```
-- set looping:  ``` controller.setLooping(true); ```
-- free resource: ``` controller.dispose(); ```
+`controller.setVolume(0.5);`
+- set looping:  `controller.setLooping(true);`
+- free resource: `controller.dispose();`
 
 # Listen playback events and values
 ```dart
@@ -154,7 +154,9 @@ controller.addListener(onPlaybackEvent);
 ...
 controller.removeListener(onPlaybackEvent); // remember to removeListener()
 ```
+
 ## Release resource
+
 ```dart
 controller.dispose();
 ```
