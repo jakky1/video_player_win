@@ -23,6 +23,8 @@ dev_dependencies:
 topics:
   - video
   - video-player
+  - audio
+  - audio-player
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
