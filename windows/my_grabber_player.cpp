@@ -35,26 +35,20 @@ STDMETHODIMP MyPlayer::QueryInterface(REFIID riid, void** ppv)
 
 HRESULT MyPlayer::initD3D11()
 {
-    static const D3D_FEATURE_LEVEL levels[] = {
-            D3D_FEATURE_LEVEL_11_0,
-            D3D_FEATURE_LEVEL_10_1,
-            D3D_FEATURE_LEVEL_10_0,
-            D3D_FEATURE_LEVEL_9_3,
-            D3D_FEATURE_LEVEL_9_2,
-            D3D_FEATURE_LEVEL_9_1
-    };
-
+    static UINT creationFlags = (D3D11_CREATE_DEVICE_VIDEO_SUPPORT 
+        | D3D11_CREATE_DEVICE_BGRA_SUPPORT 
+        | D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS);
+    
     HRESULT hr;
     wil::com_ptr<IDXGIDevice2> pDXGIDevice;
     wil::com_ptr<ID3D10Multithread> pMultithread;
-
     hr = D3D11CreateDevice(
         m_adapter.get(),
         D3D_DRIVER_TYPE_UNKNOWN, //D3D_DRIVER_TYPE_HARDWARE, //TODO: should use HARDWARE... ??
         NULL,
+        creationFlags,
+        NULL,
         0,
-        levels,
-        ARRAYSIZE(levels),
         D3D11_SDK_VERSION,
         &pDX11Device,
         NULL,
