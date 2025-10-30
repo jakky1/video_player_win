@@ -1,3 +1,7 @@
+## 3.2.1
+
+* Fix: low FPS on vp8 / vp9 (.webm) video 
+
 ## 3.2.0
 
 * support http headers (experimental)
