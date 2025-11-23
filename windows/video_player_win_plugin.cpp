@@ -324,7 +324,6 @@ std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT me
   flutter::EncodableMap arguments;
   arguments[flutter::EncodableValue("textureId")] = flutter::EncodableValue((INT64)wParam);
   arguments[flutter::EncodableValue("state")] = flutter::EncodableValue((int)lParam);
-       //call gMethodChannel->InvokeMethod() will crash..................
   gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
   // std::cout << "OnPlaybackEvent textureId: " << wParam << ", state: " << lParam << std::endl;
   return 0;
@@ -395,8 +394,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HWND hwnd = GetAncestor(m_nativeHWND, GA_ROOT);
-    HRESULT hr = player->OpenURL(wPath, player, hwnd, headerLines, [=](bool isSuccess) {
+    HRESULT hr = player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
         if (_player == NULL) {
