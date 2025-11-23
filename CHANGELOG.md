@@ -1,6 +1,6 @@
 ## 3.2.2
 
-* Support multiple window (with multi-window-related package)
+* Support multiple window (with `desktop_multi_window` package)
 
 ## 3.2.1
 
