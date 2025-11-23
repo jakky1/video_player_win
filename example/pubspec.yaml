@@ -22,6 +22,7 @@ dependencies:
   video_player_win:
     path: ..
 
+  desktop_multi_window: ^0.3.0
   video_player_platform_interface: ^6.2.1
   video_player: ^2.9.1
 

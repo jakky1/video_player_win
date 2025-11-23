@@ -1,21 +1,34 @@
 import 'dart:developer';
 import 'dart:io';
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_win/video_player_win.dart';
 //import 'package:video_player_win/video_player_win.dart';
 
-typedef VideoPlayerController = WinVideoPlayerController;
-typedef VideoPlayer = WinVideoPlayer;
-typedef VideoPlayerValue = WinVideoPlayerValue;
+//typedef VideoPlayerController = WinVideoPlayerController;
+//typedef VideoPlayer = WinVideoPlayer;
+//typedef VideoPlayerValue = WinVideoPlayerValue;
 
-void main() {
+Future<void> main(List<String> args) async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
+Future<void> createNewWindow() async {
+  final controller = await WindowController.create(
+    const WindowConfiguration(
+      hiddenAtLaunch: true,
+      arguments: '',
+    ),
+  );
+
+  await controller.show();
+}
+
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -30,13 +43,11 @@ class _MyAppState extends State<MyApp> {
 
   void reload() {
     controller?.dispose();
-    //controller = VideoPlayerController.file(File("D:\\test\\test_4k.mp4"));
-    //controller = WinVideoPlayerController.file(File("E:\\test_youtube.mp4"));
+    controller = VideoPlayerController.file(File("D:\\test\\test_4k.mp4"));
+    //controller = VideoPlayerController.file(File("C:\\Downloads\\FDM\\big-buck-bunny_trailer-.webm"));
     //controller = VideoPlayerController.networkUrl(Uri.parse("https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8"));
 
-    controller = VideoPlayerController.networkUrl(
-        Uri.parse("https://media.w3.org/2010/05/sintel/trailer.mp4"),
-        httpHeaders: httpHeaders);
+    //controller = VideoPlayerController.networkUrl(Uri.parse("https://media.w3.org/2010/05/sintel/trailer.mp4"),httpHeaders: httpHeaders);
 
     //controller = WinVideoPlayerController.file(File("E:\\Downloads\\0.FDM\\sample-file-1.flac"));
 
@@ -73,13 +84,23 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    Widget player = Container(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: controller!.value.aspectRatio,
+          child: VideoPlayer(controller!),
+        ),
+      ),
+    );
+
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
           title: const Text('video_player_win example app'),
         ),
         body: Stack(children: [
-          Container(color: Colors.black, child: VideoPlayer(controller!)),
+          player,
           Positioned(
               bottom: 0,
               child: Column(children: [
@@ -99,8 +120,9 @@ class _MyAppState extends State<MyApp> {
                                 backgroundColor: Colors.black54));
                   }),
                 ),
-                ElevatedButton(
-                    onPressed: () => reload(), child: const Text("Reload")),
+                const ElevatedButton(
+                    onPressed: createNewWindow, child: Text("New Window")),
+                ElevatedButton(onPressed: reload, child: const Text("Reload")),
                 ElevatedButton(
                     onPressed: () => controller?.play(),
                     child: const Text("Play")),

@@ -22,14 +22,11 @@
 #define WM_FLUTTER_TASK (WM_APP + 8898)
 
 // Jacky {
-flutter::PluginRegistrarWindows *g_registrar; // Jacky
-IDXGIAdapter* g_dxgiAdapter; //Jacky
 
 #include <stack>
 #include <set>
 
 #include <chrono>
-flutter::MethodChannel<flutter::EncodableValue>* gMethodChannel = NULL;
 
 std::wstring toWideString(std::string input) {
     WCHAR wPath[1024*3];
@@ -108,7 +105,7 @@ std::mutex ScreenOnKeeper::g_keeperMutex;
 HANDLE ScreenOnKeeper::g_handle = 0;
 
 
-flutter::TextureRegistrar* texture_registar_ = NULL;
+namespace video_player_win {
 
 class MyPlayerInternal : public MyPlayer, public MyPlayerCallback {
 public:
@@ -116,7 +113,7 @@ public:
   FlutterDesktopGpuSurfaceDescriptor texture_buffer;
   HWND mChildHWND = 0;
 
-  MyPlayerInternal(IDXGIAdapter* adapter) : MyPlayer(adapter) {}
+  MyPlayerInternal(VideoPlayerWinPlugin* plugin) : MyPlayer(plugin->m_dxgiAdapter), m_plugin(plugin) {}
   ~MyPlayerInternal() {
     keepScreenOn(false);
     textureId = -1;
@@ -133,6 +130,7 @@ public:
 	}
 
 private:
+  VideoPlayerWinPlugin* m_plugin;
   bool mTextureInited = false;
   HANDLE mSharedTextureHandle = 0;
   ScreenOnKeeper m_screenOnKeeper;
@@ -180,7 +178,7 @@ private:
         return;
     }
 
-    HWND hwnd = g_registrar->GetView()->GetNativeWindow();
+    HWND hwnd = m_plugin->m_nativeHWND;
     if (hwnd != NULL && IsWindow(hwnd))
     {
       // when session closed, player already destroyed, so don't notify flutter
@@ -188,10 +186,6 @@ private:
       {
         PostMessage(GetParent(hwnd), WM_FLUTTER_TASK, textureId, mPlaybackState);
       }
-    }
-    else
-    {
-      std::cout << "[video_player_win] hwnd is not a window." << std::endl;
     }
   }
 
@@ -223,18 +217,23 @@ private:
 
   void OnProcessFrame(ID3D11Texture2D* texture)
   {
-    if (texture_registar_ != NULL && textureId != -1) {
+    if (m_plugin->texture_registar_ != NULL && textureId != -1) {
       initTexture(texture);
-      texture_registar_->MarkTextureFrameAvailable(textureId);
+      m_plugin->texture_registar_->MarkTextureFrameAvailable(textureId);
     }
   }
 };
 
-std::map<int64_t, MyPlayerInternal*> playerMap; // textureId -> MyPlayerInternal*
-std::mutex mapMutex;
-bool isMFInited = false;
 
-void createTexture(MyPlayerInternal* data) {
+void initMediaFoundation() {
+  static bool isInited = false;
+  if (isInited) return;
+  MFStartup(MF_VERSION); //TODO: hint user if startup failed... if it is possible?
+  isInited = true;
+}
+
+void VideoPlayerWinPlugin::createTexture(MyPlayer* _data) {
+  auto data = (MyPlayerInternal*)_data;
   memset(&data->texture_buffer, 0, sizeof(data->texture_buffer));
 
   flutter::TextureVariant* texture = new flutter::TextureVariant(flutter::GpuSurfaceTexture(
@@ -245,24 +244,21 @@ void createTexture(MyPlayerInternal* data) {
   data->textureId = texture_registar_->RegisterTexture(texture);
 }
 
-MyPlayerInternal* getPlayerById(int64_t textureId, bool autoCreate = false) {
-  std::lock_guard<std::mutex> lock(mapMutex);
-  MyPlayerInternal* data = playerMap[textureId];
+MyPlayer* VideoPlayerWinPlugin::getPlayerById(int64_t textureId, bool autoCreate) {
+  std::lock_guard<std::mutex> lock(m_mapMutex);
+  MyPlayerInternal* data = (MyPlayerInternal*) playerMap[textureId];
   if (data == NULL && autoCreate) {
-    if (!isMFInited) {
-      MFStartup(MF_VERSION); //TODO: hint user if startup failed... if it is possible?
-      isMFInited = true;
-    }
-    data = new MyPlayerInternal(g_dxgiAdapter);
+    initMediaFoundation();
+    data = new MyPlayerInternal(this);
     createTexture(data);
     playerMap[data->textureId] = data;
   }
   return data;
 }
 
-void destroyPlayerById(int64_t textureId, bool toRelease) {
-  std::lock_guard<std::mutex> lock(mapMutex);
-  MyPlayerInternal* data = playerMap[textureId];
+void VideoPlayerWinPlugin::destroyPlayerById(int64_t textureId, bool toRelease) {
+  std::lock_guard<std::mutex> lock(m_mapMutex);
+  MyPlayerInternal* data = (MyPlayerInternal*) playerMap[textureId];
   if (data == NULL) return;
   playerMap.erase(textureId);
   if (data->textureId != -1) {
@@ -277,6 +273,17 @@ void destroyPlayerById(int64_t textureId, bool toRelease) {
   //std::cout << "native destroy player id: " << textureId << std::endl;
 }
 
+void VideoPlayerWinPlugin::destroyAllPlayers() {
+  for(auto iter = playerMap.begin(); iter != playerMap.end(); iter++) {
+    if (iter->first < 0) continue;
+    std::cout << "[video_player_win][native] old player found, deleting " << iter->first << std::endl;
+    iter->second->Shutdown();
+    iter->second->Release();
+  }
+  playerMap.clear();
+}
+
+}
 // Jacky }
 
 namespace video_player_win {
@@ -284,25 +291,27 @@ namespace video_player_win {
 // static
 void VideoPlayerWinPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
-  g_registrar = registrar; //Jacky
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           registrar->messenger(), "video_player_win",
           &flutter::StandardMethodCodec::GetInstance());
 
-  auto plugin = std::make_unique<VideoPlayerWinPlugin>();
+  auto plugin = std::make_unique<VideoPlayerWinPlugin>(registrar);
 
   channel->SetMethodCallHandler(
       [plugin_pointer = plugin.get()](const auto &call, auto result) {
         plugin_pointer->HandleMethodCall(call, std::move(result));
       });
 
-  registrar->AddPlugin(std::move(plugin));
+  // Jacky {
+  plugin->m_registrar = registrar;
+  plugin->texture_registar_ = registrar->texture_registrar();
+  plugin->gMethodChannel = std::move(channel);
+  plugin->m_nativeHWND = registrar->GetView()->GetNativeWindow();
+  plugin->m_dxgiAdapter = registrar->GetView()->GetGraphicsAdapter();
+  // Jacky }
 
-  g_dxgiAdapter = registrar->GetView()->GetGraphicsAdapter(); //Jacky
-  texture_registar_ = registrar->texture_registrar(); //Jacky
-  gMethodChannel = new flutter::MethodChannel<flutter::EncodableValue>(registrar->messenger(), "video_player_win",
-          &flutter::StandardMethodCodec::GetInstance()); //Jacky
+  registrar->AddPlugin(std::move(plugin));
 }
 
 std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -315,26 +324,29 @@ std::optional<LRESULT> VideoPlayerWinPlugin::HandleWindowProc(HWND hWnd, UINT me
   flutter::EncodableMap arguments;
   arguments[flutter::EncodableValue("textureId")] = flutter::EncodableValue((INT64)wParam);
   arguments[flutter::EncodableValue("state")] = flutter::EncodableValue((int)lParam);
+       //call gMethodChannel->InvokeMethod() will crash..................
   gMethodChannel->InvokeMethod("OnPlaybackEvent", std::make_unique<flutter::EncodableValue>(arguments));
   // std::cout << "OnPlaybackEvent textureId: " << wParam << ", state: " << lParam << std::endl;
   return 0;
 }
 
-VideoPlayerWinPlugin::VideoPlayerWinPlugin() {
-  window_proc_id = g_registrar->RegisterTopLevelWindowProcDelegate(
-  [&](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-  {
-    return HandleWindowProc(hWnd, message, wParam, lParam);
-  });
+VideoPlayerWinPlugin::VideoPlayerWinPlugin(flutter::PluginRegistrarWindows *registrar) {
+  window_proc_id = registrar->RegisterTopLevelWindowProcDelegate(
+    [this](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+      return HandleWindowProc(hWnd, message, wParam, lParam);
+    });
 }
 
 VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {
+  std::cout << "[video_player_win][native] ~VideoPlayerWinPlugin() called\n";
+  destroyAllPlayers();
   if(window_proc_id != -1) {
-    g_registrar->UnregisterTopLevelWindowProcDelegate(window_proc_id);
+    m_registrar->UnregisterTopLevelWindowProcDelegate(window_proc_id);
     window_proc_id = -1;
   }
-  texture_registar_ = NULL; //Jacky
-  MFShutdown();
+  texture_registar_ = NULL;
+  //MFShutdown();
 }
 
 void VideoPlayerWinPlugin::HandleMethodCall(
@@ -343,13 +355,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
   if (method_call.method_name().compare("clearAll") == 0) {
     // called when hot-restart in debug mode, and clear all the old players which created before hot-restart
-    for(auto iter = playerMap.begin(); iter != playerMap.end(); iter++) {
-      if (iter->first < 0) continue;
-      std::cout << "[video_player_win] old player found, deleting " << iter->first << std::endl;
-      iter->second->Shutdown();
-      iter->second->Release();
-    }
-    playerMap.clear();
+    destroyAllPlayers();
     result->Success();
     return;
   }
@@ -361,9 +367,9 @@ void VideoPlayerWinPlugin::HandleMethodCall(
   MyPlayerInternal* player;
   bool isOpenVideo = method_call.method_name().compare("openVideo") == 0;
   if (isOpenVideo) {
-    player = getPlayerById(-1, true);
+    player = (MyPlayerInternal*) getPlayerById(-1, true);
   } else {
-    player = getPlayerById(textureId, false);
+    player = (MyPlayerInternal*) getPlayerById(textureId, false);
   }
   if (player == nullptr) {
     result->Success();
@@ -389,10 +395,10 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HWND hwnd = GetAncestor(g_registrar->GetView()->GetNativeWindow(), GA_ROOT);
+    HWND hwnd = GetAncestor(m_nativeHWND, GA_ROOT);
     HRESULT hr = player->OpenURL(wPath, player, hwnd, headerLines, [=](bool isSuccess) {
       if (isSuccess) {
-        auto _player = getPlayerById(textureId, false);
+        auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
         if (_player == NULL) {
           // the player is disposed between async OpenURL() and callback here
           flutter::EncodableMap map;
