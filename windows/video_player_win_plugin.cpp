@@ -338,7 +338,7 @@ VideoPlayerWinPlugin::VideoPlayerWinPlugin(flutter::PluginRegistrarWindows *regi
 }
 
 VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {
-  std::cout << "[video_player_win][native] ~VideoPlayerWinPlugin() called\n";
+  std::cout << "[video_player_win][native] ~VideoPlayerWinPlugin() called" << std::endl;
   destroyAllPlayers();
   if(window_proc_id != -1) {
     m_registrar->UnregisterTopLevelWindowProcDelegate(window_proc_id);
