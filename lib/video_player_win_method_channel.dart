@@ -124,10 +124,6 @@ class MethodChannelVideoPlayerWin extends VideoPlayerWinPlatform {
 
   @override
   Future<void> dispose(int textureId) async {
-    await methodChannel
-        .invokeMethod<bool>('shutdown', {"textureId": textureId});
-    // NOTE: delay some time to wait last callbacks finished
-    await Future.delayed(const Duration(milliseconds: 100));
     await methodChannel.invokeMethod<bool>('dispose', {"textureId": textureId});
   }
 }

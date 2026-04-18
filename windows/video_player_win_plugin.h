@@ -11,6 +11,7 @@
 #include <map>
 #include <mutex>
 #include "my_grabber_player.h"
+#include <flutter/standard_method_codec.h>
 // Jacky }
 
 namespace video_player_win {
@@ -40,6 +41,8 @@ class VideoPlayerWinPlugin : public flutter::Plugin {
 
 
   // Jacky {
+
+  void openVideo(flutter::EncodableMap arguments, std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
   void createTexture(MyPlayer* data);
   MyPlayer* getPlayerById(int64_t textureId, bool autoCreate = false);

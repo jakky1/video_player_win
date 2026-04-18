@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <sstream>
+#include <thread>
 
 #include "my_grabber_player.h"
 #include <dxgi.h>
@@ -261,16 +262,20 @@ void VideoPlayerWinPlugin::destroyPlayerById(int64_t textureId, bool toRelease) 
   MyPlayerInternal* data = (MyPlayerInternal*) playerMap[textureId];
   if (data == NULL) return;
   playerMap.erase(textureId);
-  if (data->textureId != -1) {
-    texture_registar_->UnregisterTexture(data->textureId);
-    data->textureId = -1;
-  }
 
-  data->Shutdown();
-  if (toRelease) {
-    data->Release();
-  }
-  //std::cout << "native destroy player id: " << textureId << std::endl;
+  std::thread t1([this, data, toRelease, textureId]() {
+    if (data->textureId != -1) {
+      texture_registar_->UnregisterTexture(data->textureId);
+      data->textureId = -1;
+    }
+
+    data->Shutdown();
+    if (toRelease) {
+      data->Release();
+    }
+    //std::cout << "native destroy player id: " << textureId << std::endl;
+  });
+  t1.detach();
 }
 
 void VideoPlayerWinPlugin::destroyAllPlayers() {
@@ -348,6 +353,64 @@ VideoPlayerWinPlugin::~VideoPlayerWinPlugin() {
   //MFShutdown();
 }
 
+void VideoPlayerWinPlugin::openVideo(flutter::EncodableMap arguments, std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result) { 
+  std::vector<std::wstring> headerLines;
+  auto httpHeaders = std::get<flutter::EncodableMap>(arguments[flutter::EncodableValue("httpHeaders")]);
+  for (auto it = httpHeaders.begin(); it != httpHeaders.end(); it++) {
+    auto key = std::get<std::string>(it->first);
+    auto value = std::get<std::string>(it->second);
+    auto line = toWideString(key) + L": " + toWideString(value);
+    headerLines.push_back(line);
+  }
+
+  auto path = std::get<std::string>(arguments[flutter::EncodableValue("path")]);
+  WCHAR wPath[1024];
+  auto convResult = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
+  if (convResult < 0) {
+    std::cout << "[video_player_win] native convert path to utf16 (WCHAR*) failed: path = " << path << std::endl;
+  }
+
+  auto player = (MyPlayerInternal*) getPlayerById(-1, true);
+  auto textureId = player->textureId;
+  
+  HRESULT hr = player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
+    if (isSuccess) {
+      auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
+      if (_player == NULL) {
+        // the player is disposed between async OpenURL() and callback here
+        flutter::EncodableMap map;
+        map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
+        shared_result->Success(map);
+        return;
+      }
+
+      SIZE videoSize = _player->GetVideoSize();
+      flutter::EncodableMap map;
+      float volume = 1.0f;
+      _player->GetVolume(&volume);
+      map[flutter::EncodableValue("result")] = flutter::EncodableValue(true);
+      map[flutter::EncodableValue("textureId")] = flutter::EncodableValue(_player->textureId);
+      map[flutter::EncodableValue("duration")] = flutter::EncodableValue((int64_t)_player->GetDuration());
+      map[flutter::EncodableValue("videoWidth")] = flutter::EncodableValue(videoSize.cx);
+      map[flutter::EncodableValue("videoHeight")] = flutter::EncodableValue(videoSize.cy);
+      map[flutter::EncodableValue("volume")] = flutter::EncodableValue((double)volume);
+      shared_result->Success(flutter::EncodableValue(map));
+    } else {
+      // TODO: call destroyPlayerById(true) when open video failed here will crash since player->Release() called... how to fix?
+      destroyPlayerById(player->textureId, true);
+
+      flutter::EncodableMap map;
+      map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
+      shared_result->Success(map);
+    }
+  });
+  if (FAILED(hr)) {
+    flutter::EncodableMap map;
+    map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
+    shared_result->Success(map);
+  }
+}
+
 void VideoPlayerWinPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
@@ -363,73 +426,20 @@ void VideoPlayerWinPlugin::HandleMethodCall(
   flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
 
   auto textureId = arguments[flutter::EncodableValue("textureId")].LongValue();
-  MyPlayerInternal* player;
+  MyPlayerInternal* player = nullptr;
   bool isOpenVideo = method_call.method_name().compare("openVideo") == 0;
-  if (isOpenVideo) {
-    player = (MyPlayerInternal*) getPlayerById(-1, true);
-  } else {
+  if (!isOpenVideo) {
     player = (MyPlayerInternal*) getPlayerById(textureId, false);
-  }
-  if (player == nullptr) {
-    result->Success();
-    return;
+    if (player == nullptr) {
+      result->Success();
+      return;
+    }
   }
 
   if (isOpenVideo) {
-    std::vector<std::wstring> headerLines;
-    auto httpHeaders = std::get<flutter::EncodableMap>(arguments[flutter::EncodableValue("httpHeaders")]);
-    for (auto it = httpHeaders.begin(); it != httpHeaders.end(); it++) {
-      auto key = std::get<std::string>(it->first);
-      auto value = std::get<std::string>(it->second);
-      auto line = toWideString(key) + L": " + toWideString(value);
-      headerLines.push_back(line);
-    }
-
-    auto path = std::get<std::string>(arguments[flutter::EncodableValue("path")]);
-    WCHAR wPath[1024];
-    auto convResult = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
-    if (convResult < 0) {
-      std::cout << "[video_player_win] native convert path to utf16 (WCHAR*) failed: path = " << path << std::endl;
-    }
-
-    textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HRESULT hr = player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
-      if (isSuccess) {
-        auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
-        if (_player == NULL) {
-          // the player is disposed between async OpenURL() and callback here
-          flutter::EncodableMap map;
-          map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
-          shared_result->Success(map);
-          return;
-        }
-
-        SIZE videoSize = _player->GetVideoSize();
-        flutter::EncodableMap map;
-        float volume = 1.0f;
-        _player->GetVolume(&volume);
-        map[flutter::EncodableValue("result")] = flutter::EncodableValue(true);
-        map[flutter::EncodableValue("textureId")] = flutter::EncodableValue(_player->textureId);
-        map[flutter::EncodableValue("duration")] = flutter::EncodableValue((int64_t)_player->GetDuration());
-        map[flutter::EncodableValue("videoWidth")] = flutter::EncodableValue(videoSize.cx);
-        map[flutter::EncodableValue("videoHeight")] = flutter::EncodableValue(videoSize.cy);
-        map[flutter::EncodableValue("volume")] = flutter::EncodableValue((double)volume);
-        shared_result->Success(flutter::EncodableValue(map));
-      } else {
-        // TODO: call destroyPlayerById(true) when open video failed here will crash since player->Release() called... how to fix?
-        destroyPlayerById(player->textureId, true);
-
-        flutter::EncodableMap map;
-        map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
-        shared_result->Success(map);
-      }
-    });
-    if (FAILED(hr)) {
-      flutter::EncodableMap map;
-      map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
-      result->Success(map);
-    }
+    std::thread t1(&VideoPlayerWinPlugin::openVideo, this, arguments, shared_result);
+    t1.detach();
   } else if (method_call.method_name().compare("play") == 0) {
     player->Play();
     result->Success(flutter::EncodableValue(true));
@@ -453,12 +463,6 @@ void VideoPlayerWinPlugin::HandleMethodCall(
   } else if (method_call.method_name().compare("setVolume") == 0) {
     double volume = std::get<double>(arguments[flutter::EncodableValue("volume")]);
     player->SetVolume((float)volume);
-    result->Success(flutter::EncodableValue(true));
-  } else if (method_call.method_name().compare("shutdown") == 0) {
-    // NOTE: because m_pSession->BeginGetEvent(this) will keep *this (player),
-    //       so we need to call m_pSession->Shutdown() first
-    //       then client call player->Release() will make refCount = 0
-    player->Shutdown();
     result->Success(flutter::EncodableValue(true));
   } else if (method_call.method_name().compare("dispose") == 0) {
     destroyPlayerById(textureId, true);
