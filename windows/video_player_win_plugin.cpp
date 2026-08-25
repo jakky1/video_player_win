@@ -394,16 +394,8 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    // player->OpenURL() stores the callback below as a member of `player` itself
-    // (MyPlayer::m_loadCallback) and invokes it synchronously from within OpenURL().
-    // On failure the callback calls destroyPlayerById(..., true), which can Release()
-    // `player` down to 0 and `delete this` while OpenURL() is still executing on
-    // `player`'s own call stack (e.g. `m_loadCallback = NULL;` right after this call
-    // returns, plus ~MyPlayer()'s COM member teardown) -> access violation.
-    // This extra ref keeps `player` alive until HandleMethodCall() returns, deferring
-    // the actual delete to a point where nothing is still executing inside it.
     wil::com_ptr<MyPlayerInternal> playerGuard(player);
-    HRESULT hr = player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
+    player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
         if (_player == NULL) {
@@ -434,12 +426,6 @@ void VideoPlayerWinPlugin::HandleMethodCall(
         shared_result->Success(map);
       }
     });
-    // `result` was already moved into `shared_result` above, so it must not be
-    // touched here (it's a moved-from, effectively-null unique_ptr). OpenURL()
-    // now always invokes the loadCallback above exactly once on any failure
-    // (including its early-out paths), which completes `shared_result` itself,
-    // so there is nothing left to do with the return value here.
-    (void)hr;
   } else if (method_call.method_name().compare("play") == 0) {
     player->Play();
     result->Success(flutter::EncodableValue(true));
