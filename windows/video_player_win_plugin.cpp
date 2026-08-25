@@ -434,11 +434,12 @@ void VideoPlayerWinPlugin::HandleMethodCall(
         shared_result->Success(map);
       }
     });
-    if (FAILED(hr)) {
-      flutter::EncodableMap map;
-      map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
-      result->Success(map);
-    }
+    // `result` was already moved into `shared_result` above, so it must not be
+    // touched here (it's a moved-from, effectively-null unique_ptr). OpenURL()
+    // now always invokes the loadCallback above exactly once on any failure
+    // (including its early-out paths), which completes `shared_result` itself,
+    // so there is nothing left to do with the return value here.
+    (void)hr;
   } else if (method_call.method_name().compare("play") == 0) {
     player->Play();
     result->Success(flutter::EncodableValue(true));

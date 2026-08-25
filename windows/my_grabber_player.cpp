@@ -213,7 +213,13 @@ HRESULT MyPlayer::OpenURL(const WCHAR* pszFileName, MyPlayerCallback* playerCall
     wil::com_ptr<IMFMediaEngineClassFactory> pFactory; // TODO: keep as static member ?
     wil::com_ptr<IMFAttributes> pAttributes;    
 
-    if (m_isShutdown || m_pEngine) return E_ABORT;
+    // Always invoke loadCallback exactly once on any failure path (including this
+    // early-out) so callers can complete their pending result solely from the
+    // callback, instead of also having to check OpenURL()'s return value.
+    if (m_isShutdown || m_pEngine) {
+        loadCallback(false);
+        return E_ABORT;
+    }
 
     m_frameCallback = playerCallback;
     m_loadCallback = loadCallback;
