@@ -396,7 +396,8 @@ void VideoPlayerWinPlugin::HandleMethodCall(
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HRESULT hr = player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
+    wil::com_ptr<MyPlayerInternal> playerGuard(player);
+    player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
         if (_player == NULL) {
@@ -427,11 +428,6 @@ void VideoPlayerWinPlugin::HandleMethodCall(
         shared_result->Success(map);
       }
     });
-    if (FAILED(hr)) {
-      flutter::EncodableMap map;
-      map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
-      result->Success(map);
-    }
   } else if (method_call.method_name().compare("play") == 0) {
     player->Play();
     result->Success(flutter::EncodableValue(true));
