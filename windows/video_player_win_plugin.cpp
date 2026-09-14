@@ -208,6 +208,8 @@ private:
       texture_buffer.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
       texture_buffer.width = desc.Width;
       texture_buffer.height = desc.Height;
+      texture_buffer.visible_width = desc.Width;
+      texture_buffer.visible_height = desc.Height;
       texture_buffer.format = kFlutterDesktopPixelFormatBGRA8888;  //kFlutterDesktopPixelFormatRGBA8888; //or kFlutterDesktopPixelFormatBGRA8888
       texture_buffer.handle = mSharedTextureHandle;
 
