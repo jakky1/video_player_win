@@ -1,3 +1,7 @@
+## 3.3.0
+
+* Fix: black screen in Impeller rendering engine in Flutter 3.47+
+
 ## 3.2.2
 
 * Support multiple window (with `desktop_multi_window` package)
