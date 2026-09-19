@@ -242,9 +242,37 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
     value = pv;
     _finalizer.attach(this, textureId_, detach: this);
 
+    // The Media Foundation MediaEngine resolves its duration asynchronously,
+    // so GetDuration() can still report 0 (or -1) when OpenURL's completion
+    // callback fires. The 'video_player' package derives value.duration
+    // exclusively from the initialized event below and its play() treats
+    // position == duration as "ended", force-seeking to zero — which made
+    // every play-after-pause restart the video from its first frame. Wait
+    // (bounded) for the engine to report a duration before emitting the
+    // initialized event; if none arrives within the deadline, fall back to
+    // the previous behavior.
+    if (value.duration <= Duration.zero) {
+      try {
+        final deadline = DateTime.now().add(const Duration(seconds: 3));
+        while (value.duration <= Duration.zero &&
+            DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+          final int? ms =
+              await VideoPlayerWinPlatform.instance.getDuration(textureId_);
+          if (ms != null && ms > 0) {
+            value = value.copyWith(duration: Duration(milliseconds: ms));
+            break;
+          }
+        }
+      } catch (_) {
+        // Duration channel unavailable: emit with whatever we have (previous
+        // behavior), never blocking initialization.
+      }
+    }
+
     _eventStreamController.add(VideoEvent(
       eventType: VideoEventType.initialized,
-      duration: pv.duration,
+      duration: value.duration,
       size: pv.size,
     ));
     log("flutter: video player file opened: id=$textureId_");
