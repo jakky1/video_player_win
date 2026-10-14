@@ -1,3 +1,7 @@
+## 3.3.1
+
+* Fix playback of URLs longer than 1024 characters- #56
+
 ## 3.3.0
 
 * Fix: black screen in Impeller rendering engine in Flutter 3.47+
