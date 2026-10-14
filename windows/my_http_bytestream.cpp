@@ -38,16 +38,16 @@ bool MyHttpConnection::open(std::wstring& url, std::vector<std::wstring> headers
 {
     BOOL bResults = FALSE;
     URL_COMPONENTS urlComp = { sizeof(URL_COMPONENTS) };
-    WCHAR lpszHostName[1024];
-    WCHAR lpszUrlPath[1024];
 
     assert(hSession == NULL);
 
-    urlComp.lpszHostName = lpszHostName;
-    urlComp.lpszUrlPath = lpszUrlPath;
-    urlComp.dwHostNameLength = sizeof(lpszHostName) / sizeof(WCHAR);
-    urlComp.dwUrlPathLength = sizeof(lpszUrlPath) / sizeof(WCHAR);
+    urlComp.dwHostNameLength = (DWORD)-1;
+    urlComp.dwUrlPathLength = (DWORD)-1;
+    urlComp.dwExtraInfoLength = (DWORD)-1;
     CHECK(WinHttpCrackUrl(url.c_str(), 0, 0, &urlComp), "WinHttpCrackUrl failed");
+    std::wstring hostName(urlComp.lpszHostName, urlComp.dwHostNameLength);
+    std::wstring urlPath(urlComp.lpszUrlPath, urlComp.dwUrlPathLength);
+    urlPath.append(urlComp.lpszExtraInfo, urlComp.dwExtraInfoLength);
 
     hSession = WinHttpOpen(L"A WinHTTP Example Program/1.0",
         WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
@@ -55,11 +55,11 @@ bool MyHttpConnection::open(std::wstring& url, std::vector<std::wstring> headers
         WINHTTP_NO_PROXY_BYPASS, 0);
     CHECK(hSession, "WinHttpOpen failed");
 
-    hConnect = WinHttpConnect(hSession, urlComp.lpszHostName,
+    hConnect = WinHttpConnect(hSession, hostName.c_str(),
         INTERNET_DEFAULT_HTTPS_PORT, 0);
     CHECK(hConnect, "WinHttpConnect failed");
 
-    hRequest = WinHttpOpenRequest(hConnect, L"GET", urlComp.lpszUrlPath,
+    hRequest = WinHttpOpenRequest(hConnect, L"GET", urlPath.c_str(),
         NULL, WINHTTP_NO_REFERER,
         NULL, WINHTTP_FLAG_SECURE);
     CHECK(hRequest, "WinHttpOpenRequest failed");

@@ -29,13 +29,14 @@
 #include <chrono>
 
 std::wstring toWideString(std::string input) {
-    WCHAR wPath[1024*3];
-    auto convResult = MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
-    if (convResult < 0) {
+    int length = MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, NULL, 0);
+    if (length <= 0) {
       std::cout << "[video_player_win] native convert string to utf16 (WCHAR*) failed: path = " << input << std::endl;
       return L"";
     }
-    return std::wstring(wPath);
+    std::wstring output(length - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, input.c_str(), -1, output.data(), length);
+    return output;
 }
 
 inline uint64_t getCurrentTime() {
@@ -388,15 +389,11 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     }
 
     auto path = std::get<std::string>(arguments[flutter::EncodableValue("path")]);
-    WCHAR wPath[1024];
-    auto convResult = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wPath, sizeof(wPath) / sizeof(WCHAR));
-    if (convResult < 0) {
-      std::cout << "[video_player_win] native convert path to utf16 (WCHAR*) failed: path = " << path << std::endl;
-    }
+    auto wPath = toWideString(path);
 
     textureId = player->textureId;
     std::shared_ptr<flutter::MethodResult<flutter::EncodableValue>> shared_result = std::move(result);
-    HRESULT hr = player->OpenURL(wPath, player, m_nativeHWND, headerLines, [=](bool isSuccess) {
+    HRESULT hr = player->OpenURL(wPath.c_str(), player, m_nativeHWND, headerLines, [=](bool isSuccess) {
       if (isSuccess) {
         auto _player = (MyPlayerInternal*) getPlayerById(textureId, false);
         if (_player == NULL) {
