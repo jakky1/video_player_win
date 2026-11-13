@@ -427,7 +427,7 @@ void VideoPlayerWinPlugin::HandleMethodCall(
     if (FAILED(hr)) {
       flutter::EncodableMap map;
       map[flutter::EncodableValue("result")] = flutter::EncodableValue(false);
-      result->Success(map);
+      shared_result->Success(map);
     }
   } else if (method_call.method_name().compare("play") == 0) {
     player->Play();
