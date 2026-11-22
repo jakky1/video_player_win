@@ -1,3 +1,9 @@
+## 3.3.2
+
+* Fix #44: setLooping(true) only audio when play ended and looping.
+* Fix #58: Calling play() after the video has finished playing causes unexpected behavior
+* Fix: crash when open url failed
+
 ## 3.3.1
 
 * Fix playback of URLs longer than 1024 characters- #56
