@@ -205,7 +205,7 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
       case 6: // MESessionEnded
         //log("[video_player_win] playback event: play ended");
         if (_isLooping) {
-          seekTo(Duration.zero);
+          play(); // Fix issue#44: seek() after ended, will play audio without video frames...
         } else {
           _cancelTrackingPosition();
           value = value.copyWith(isCompleted: true, position: value.duration);
@@ -252,6 +252,11 @@ class WinVideoPlayerController extends ValueNotifier<WinVideoPlayerValue> {
 
   Future<void> play() async {
     if (!value.isInitialized) throw ArgumentError("video file not opened yet");
+    if (value.position == value.duration) {
+      // Fix issue#44: play() after ended, will play audio without video frames...
+      await pause();
+      await seekTo(Duration.zero);
+    }
     await VideoPlayerWinPlatform.instance.play(textureId_);
   }
 
